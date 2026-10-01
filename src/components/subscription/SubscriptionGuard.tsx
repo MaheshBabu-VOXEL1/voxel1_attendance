@@ -1,0 +1,71 @@
+import React from 'react';
+import { useSubscription } from '../../context/SubscriptionContext';
+import { useToast } from '../../context/ToastContext';
+import { AlertTriangle } from 'lucide-react';
+
+interface SubscriptionGuardProps {
+  children: React.ReactNode;
+  action?: 'write' | 'read';
+  fallback?: React.ReactNode;
+  showMessage?: boolean;
+}
+
+export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({
+  children,
+  action = 'write',
+  fallback,
+  showMessage = true
+}) => {
+  const { subscription, canPerformAction } = useSubscription();
+
+  if (canPerformAction(action)) {
+    return <>{children}</>;
+  }
+
+  if (fallback) {
+    return <>{fallback}</>;
+  }
+
+  if (!showMessage) {
+    return null;
+  }
+
+  const getMessage = () => {
+    if (subscription?.status === 'EXPIRED') {
+      return 'Your organization is in read-only mode. Contact support to restore access.';
+    }
+    if (subscription?.status === 'SUSPENDED') {
+      return 'Your account is suspended. Contact support for assistance.';
+    }
+    return 'This feature is not available with your current subscription.';
+  };
+
+  return (
+    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
+      <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+      <span>{getMessage()}</span>
+    </div>
+  );
+};
+
+// Hook for checking permissions in event handlers
+export const useSubscriptionCheck = () => {
+  const { subscription, canPerformAction } = useSubscription();
+  const { showToast } = useToast();
+
+  const checkAndAlert = (action: 'write' | 'read' = 'write'): boolean => {
+    if (canPerformAction(action)) {
+      return true;
+    }
+
+    if (subscription?.status === 'EXPIRED') {
+      showToast('Your organization is in read-only mode. Contact support to restore access.', 'error');
+    } else if (subscription?.status === 'SUSPENDED') {
+      showToast('Your account is suspended. Please contact support.', 'error');
+    }
+
+    return false;
+  };
+
+  return { checkAndAlert, canPerformAction, subscription };
+};

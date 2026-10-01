@@ -1,0 +1,26 @@
+-- ============================================================
+-- Voxel1 — pg_net Extension for Selfie Storage Cleanup
+-- 0016_schedule_selfie_storage_cleanup.sql
+--
+-- Enables pg_net so the cron-selfie-storage-cleanup Edge Function
+-- can be called via net.http_post() from pg_cron.
+--
+-- The cron schedule itself must be created via Supabase SQL Editor
+-- (not through a migration), as the Supabase platform restricts
+-- cron.schedule() during db push. Run this manually:
+--
+--   select cron.schedule(
+--     'selfie-storage-cleanup',
+--     '0 2 * * *',
+--     $$
+--       select net.http_post(
+--         url := 'https://<PROJECT_REF>.supabase.co/functions/v1/cron-selfie-storage-cleanup',
+--         headers := '{"Authorization": "Bearer <CRON_SECRET>", "Content-Type": "application/json"}'::jsonb,
+--         body := '{}'::jsonb
+--       );
+--     $$
+--   );
+-- ============================================================
+
+-- pg_net: enables net.http_post() for calling Edge Functions from pg_cron
+create extension if not exists pg_net with schema extensions;

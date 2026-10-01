@@ -1,0 +1,3 @@
+# Voxel1 is an internal company app: keep it out of search engines.
+User-agent: *
+Disallow: /

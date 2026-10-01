@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>VOXEL1 — Attendance &amp; HR</title>
+
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Voxel1 attendance and HR app: GPS check-in at the office, leave requests and daily tasks for the Voxel1 team.">
+  <meta name="author" content="VOXEL1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta property="og:title" content="VOXEL1 — Attendance &amp; HR">
+  <meta property="og:site_name" content="VOXEL1">
+  <meta property="og:description" content="Voxel1 attendance and HR app: GPS check-in at the office, leave requests and daily tasks for the Voxel1 team.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://muddy-queen-14c6.webdeploy787.workers.dev/img/voxel1-social-preview.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="VOXEL1 attendance and HR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://muddy-queen-14c6.webdeploy787.workers.dev/img/voxel1-social-preview.png">
+
+  <!-- PWA & iOS Specific Meta Tags -->
+  <meta name="theme-color" content="#fcfdfe">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="VOXEL1">
+
+
+
+
+
+  <!-- High Quality Icons for iOS -->
+  <link rel="apple-touch-icon" href="/img/icon-192.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="/img/icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/img/icon-192.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="/img/icon-192.png">
+  
+  <!-- Browser tab icon: the VOXEL1 shield -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="/img/favicon-64.png">
+  <!-- Vital: Link to manifest at the root level -->
+  <link rel="manifest" href="/manifest.json">
+  <!-- The Inter font is bundled with the app (@fontsource-variable/inter); no outside requests. -->
+<script>
+  // Dark mode preload — prevents white flash on refresh
+  (function() {
+    try {
+      var darkPref = localStorage.getItem('voxel1-dark-mode') || 'light'; // light by default; dark only when chosen
+      var isDark = darkPref === 'dark' ||
+        (darkPref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+      if (isDark) {
+        // Apply dark class immediately — the .dark CSS rules in the static
+        // hero <style> block handle background/text overrides for both the
+        // skeleton and body, so no element lookups are needed here.
+        document.documentElement.classList.add('dark');
+
+        // Update theme-color meta tag to dark
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', '#0f172a');
+      }
+    } catch(e) {}
+  })();
+</script>
+</head>
+<body class="bg-[#fcfdfe] text-slate-900">
+  <div id="root"></div>
+<script>
+  // Capture install prompt event (must be inline, not in ESM module,
+  // because on slower devices beforeinstallprompt fires before modules load)
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    window.deferredPWAPrompt = e;
+    window.dispatchEvent(new CustomEvent('pwa-install-available'));
+    console.log('PWA: Install prompt captured');
+  });
+
+  // Track successful installation
+  window.addEventListener('appinstalled', function() {
+    console.log('PWA: Successfully installed');
+    window.deferredPWAPrompt = null;
+    window.dispatchEvent(new CustomEvent('pwa-installed'));
+  });
+</script>
+<script type="module" src="/src/index.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,292 @@
+@import "tailwindcss";
+
+/*
+ * Bind the `dark:` variant to the .dark class rather than the OS setting.
+ *
+ * Tailwind v4 defaults `dark:` to @media (prefers-color-scheme: dark). This app
+ * does not use the OS setting directly — ThemeContext writes a .dark class on
+ * <html> from the user's own preference, and the override rules further down
+ * this file are keyed on that class.
+ *
+ * Without this declaration the two disagree: the ~94 `dark:` utilities in the
+ * components follow the operating system while the override rules follow the
+ * in-app toggle, so any user whose OS scheme differs from their chosen theme
+ * sees a half-themed page. It only looks correct when the two happen to match,
+ * which is why it survived so long.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ===== Custom Theme ===== */
+@theme {
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-light: var(--primary-light);
+
+  --animate-slide-up: slideUp 0.3s ease-out;
+  --font-sans: 'Inter Variable', 'Inter', system-ui, sans-serif;
+}
+
+@keyframes slideUp {
+  0% { transform: translateY(10px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* ===== Root Variables ===== */
+:root {
+  --primary: #4a6fa5;
+  --primary-hover: #3b5d8c;
+  --primary-light: #d4e4f7;
+  /* Primary at ~12% alpha. Used by the .dark .bg-primary-light rules below.
+     Previously written from JS as `${primary}20`; now static, like the rest. */
+  --primary-light-dark: #4a6fa520;
+}
+
+body {
+  font-family: 'Inter Variable', 'Inter', system-ui, sans-serif;
+  margin: 0;
+  background-color: #fcfdfe;
+  -webkit-tap-highlight-color: transparent;
+  padding-bottom: env(safe-area-inset-bottom);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media all and (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.brand-gradient {
+  background: linear-gradient(135deg, var(--primary) 0%, #f59e0b 50%, #10b981 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ===== DARK MODE OVERRIDES ===== */
+html.dark body { background-color: #0f172a; color: #e2e8f0; }
+
+/* Backgrounds */
+.dark .bg-white { background-color: #1e293b !important; }
+.dark .bg-\[\#fcfdfe\] { background-color: #0f172a !important; }
+.dark .bg-\[\#f8fafc\] { background-color: #0f172a !important; }
+.dark .bg-slate-50 { background-color: #1e293b !important; }
+.dark .bg-slate-100 { background-color: #334155 !important; }
+.dark .bg-slate-200 { background-color: #475569 !important; }
+.dark .bg-gray-50 { background-color: #1e293b !important; }
+.dark .bg-gray-100 { background-color: #334155 !important; }
+
+/* Hover backgrounds */
+.dark .hover\:bg-slate-50:hover { background-color: #334155 !important; }
+.dark .hover\:bg-slate-100:hover { background-color: #475569 !important; }
+.dark .hover\:bg-slate-200:hover { background-color: #475569 !important; }
+.dark .hover\:bg-white:hover { background-color: #334155 !important; }
+.dark .hover\:bg-gray-50:hover { background-color: #334155 !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #475569 !important; }
+.dark .hover\:bg-rose-50:hover { background-color: #4c1d2e !important; }
+
+/* Text */
+.dark .text-slate-900 { color: #f1f5f9 !important; }
+.dark .text-slate-800 { color: #e2e8f0 !important; }
+.dark .text-slate-700 { color: #cbd5e1 !important; }
+.dark .text-slate-600 { color: #94a3b8 !important; }
+.dark .text-slate-500 { color: #94a3b8 !important; }
+.dark .text-slate-400 { color: #64748b !important; }
+.dark .text-slate-300 { color: #475569 !important; }
+.dark .text-gray-900 { color: #f1f5f9 !important; }
+.dark .text-gray-800 { color: #e2e8f0 !important; }
+.dark .text-gray-700 { color: #cbd5e1 !important; }
+.dark .text-gray-600 { color: #94a3b8 !important; }
+.dark .text-gray-500 { color: #94a3b8 !important; }
+
+/* Borders */
+.dark .border-slate-100 { border-color: #334155 !important; }
+.dark .border-slate-200 { border-color: #475569 !important; }
+.dark .border-slate-300 { border-color: #475569 !important; }
+.dark .border-gray-100 { border-color: #334155 !important; }
+.dark .border-gray-200 { border-color: #475569 !important; }
+
+/* Dividers */
+.dark .divide-slate-100 > * + * { border-color: #334155 !important; }
+.dark .divide-slate-200 > * + * { border-color: #475569 !important; }
+
+/* Rings */
+.dark .ring-slate-100 { --tw-ring-color: #334155 !important; }
+.dark .ring-slate-200 { --tw-ring-color: #475569 !important; }
+
+/* Shadows */
+.dark .shadow-sm { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.3) !important; }
+.dark .shadow-md { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4) !important; }
+.dark .shadow-lg { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.4) !important; }
+.dark .shadow-xl { box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.4) !important; }
+
+/* Backdrop / translucent whites */
+.dark .bg-white\/95 { background-color: rgba(30, 41, 59, 0.95) !important; }
+.dark .bg-white\/90 { background-color: rgba(30, 41, 59, 0.9) !important; }
+.dark .bg-white\/80 { background-color: rgba(30, 41, 59, 0.8) !important; }
+.dark .bg-white\/20 { background-color: rgba(30, 41, 59, 0.2) !important; }
+
+/* Primary light — dark variant */
+.dark .bg-primary-light { background-color: var(--primary-light-dark) !important; }
+.dark .bg-primary-light\/50 { background-color: var(--primary-light-dark) !important; }
+
+/* Form inputs */
+.dark input, .dark textarea, .dark select {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: #475569 !important;
+}
+.dark input::placeholder, .dark textarea::placeholder {
+  color: #64748b !important;
+}
+.dark input:focus, .dark textarea:focus, .dark select:focus {
+  border-color: var(--primary) !important;
+}
+
+/* The public account entry follows the supplied light design in either theme. */
+.dark .account-entry,
+.dark .account-entry .bg-white {
+  background-color: #fff !important;
+  color: #172945;
+}
+.dark .account-entry input {
+  background-color: #fff !important;
+  color: #172945 !important;
+  border-color: #c7d5e6 !important;
+}
+
+/* Scrollbar */
+.dark ::-webkit-scrollbar { width: 8px; height: 8px; }
+.dark ::-webkit-scrollbar-track { background: #1e293b; }
+.dark ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+/* Gradient from arbitrary light colors */
+.dark .from-\[\#f8fafc\] { --tw-gradient-from: #0f172a !important; }
+.dark .from-\[\#fcfdfe\] { --tw-gradient-from: #0f172a !important; }
+
+/* Footer dark bg stays dark */
+.dark .bg-slate-900 { background-color: #020617 !important; }
+.dark .border-slate-800 { border-color: #1e293b !important; }
+
+/* ===== DARK MODE — PROSE / RICH CONTENT OVERRIDES ===== */
+/* prose-invert handles most elements, these cover edge cases from WYSIWYG content */
+
+/* Tables in prose — dark mode */
+.dark .prose table { background-color: #1e293b; border-color: #475569; }
+.dark .prose thead { background-color: #334155; border-color: #475569; }
+.dark .prose th { color: #f1f5f9; border-color: #475569; background-color: #334155; }
+.dark .prose td { color: #e2e8f0; border-color: #475569; }
+.dark .prose tbody tr { border-color: #475569; }
+.dark .prose tbody tr:nth-child(even) { background-color: #1a2332; }
+
+/* Code blocks and inline code — dark mode */
+.dark .prose pre { background-color: #0f172a; border-color: #334155; }
+.dark .prose pre code { color: #e2e8f0; background-color: transparent; }
+.dark .prose code { color: #f1f5f9; background-color: #334155; }
+.dark .prose :not(pre) > code { color: #fca5a5; background-color: #334155; }
+
+/* Blockquotes — dark mode */
+.dark .prose blockquote { color: #cbd5e1; border-left-color: var(--primary); background-color: #1a2332; }
+
+/* Horizontal rules — dark mode */
+.dark .prose hr { border-color: #475569; }
+
+/* Images — override any inline dark backgrounds */
+.dark .prose img { background-color: transparent; }
+
+/* Figure / figcaption */
+.dark .prose figcaption { color: #94a3b8; }
+
+/* Strong / bold in dark mode */
+.dark .prose strong { color: #f1f5f9; }
+
+/* Override any inline style colors from WYSIWYG editor */
+.dark .prose [style*="color:"] { color: inherit !important; }
+/* Imported content also carries legacy <font color="#0969da"> presentation
+   attributes, which are not inline styles and so slipped past the rule above —
+   that blue measured 3.6:1 on the dark article ground. */
+.dark .prose font[color] { color: inherit !important; }
+.dark .prose [style*="background-color:"] { background-color: inherit !important; }
+.dark .prose [style*="background:"] { background: inherit !important; }
+
+/* ===== MOBILE RESPONSIVENESS — PROSE CONTENT ===== */
+
+/* Responsive tables — horizontal scroll on narrow screens */
+.prose table {
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+.prose table tbody,
+.prose table thead,
+.prose table tr,
+.prose table th,
+.prose table td {
+  white-space: nowrap;
+}
+
+/* But on wider screens, allow tables to display normally */
+@media (min-width: 768px) {
+  .prose table {
+    display: table;
+    white-space: normal;
+  }
+  .prose table tbody,
+  .prose table thead,
+  .prose table tr,
+  .prose table th,
+  .prose table td {
+    white-space: normal;
+  }
+}
+
+/* Responsive images in prose content — prevent overflow */
+.prose img {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* Responsive pre/code blocks — allow horizontal scroll */
+.prose pre {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+.prose pre code {
+  white-space: pre;
+  word-wrap: normal;
+}
+
+/* Prevent long unbreakable content from overflowing */
+.prose {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Responsive iframes (embedded videos, etc.) */
+.prose iframe {
+  max-width: 100% !important;
+}
+
+/* ===== REDUCED MOTION ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Phones: iOS Safari zooms the page when a focused field has text under 16px.
+   Keep form fields at 16px on small screens so tapping a field never zooms. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}

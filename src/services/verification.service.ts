@@ -1,0 +1,178 @@
+import { supabase, isSupabaseConfigured } from './supabase';
+import { apiClient } from './api.client';
+import { employeeService } from './employee.service';
+
+const SUPABASE_FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL
+  ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
+  : null;
+
+export const verificationService = {
+  async checkVerified(email: string): Promise<boolean> {
+    if (!isSupabaseConfigured() || !email) return false;
+    try {
+      // email lives in auth.users, not profiles — resolve via current session
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || user.email?.toLowerCase() !== email.toLowerCase().trim()) return false;
+      const { data } = await supabase.from('profiles').select('verified').eq('id', user.id).maybeSingle();
+      if (data?.verified) return true;
+      // Fallback: check if email is confirmed in auth (covers the gap before
+      // the DB trigger or backfill runs — migration 0022).
+      if (user.email_confirmed_at) return true;
+      return false;
+    } catch {
+      return false;
+    }
+  },
+
+  async testEmailConfiguration(testEmail: string): Promise<{ success: boolean; message: string }> {
+    if (!isSupabaseConfigured()) return { success: false, message: 'Supabase not configured' };
+    try {
+      // Trigger a password reset email as a test — Supabase handles delivery
+      const { error } = await supabase.auth.resetPasswordForEmail(testEmail);
+      if (error) throw error;
+      return { success: true, message: 'Test email sent! Check your inbox in 1-2 minutes.' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Email test failed' };
+    }
+  },
+
+  async getUnverifiedUsers(): Promise<{
+    success: boolean;
+    count: number;
+    users: Array<{ id: string; email: string; name: string; role: string; created: string; updated: string }>;
+    error?: string;
+  }> {
+    if (!isSupabaseConfigured()) return { success: false, count: 0, users: [], error: 'Not authenticated' };
+    try {
+      const orgId = apiClient.getOrganizationId();
+      let query = supabase
+        .from('profiles')
+        .select('id, name, role, created, updated')
+        .eq('verified', false);
+      if (orgId) query = query.eq('organization_id', orgId);
+      const { data, error } = await query.order('created', { ascending: false });
+      if (error) throw error;
+      const users = (data || []).map(r => ({
+        id: r.id,
+        email: '', // email lives in auth.users — not available via profiles query
+        name: r.name || '',
+        role: r.role || '',
+        created: r.created || '',
+        updated: r.updated || '',
+      }));
+      return { success: true, count: users.length, users };
+    } catch (err: any) {
+      return { success: false, count: 0, users: [], error: err?.message || 'Failed to fetch users' };
+    }
+  },
+
+  async manuallyVerifyUser(userId: string): Promise<{ success: boolean; message: string }> {
+    if (!isSupabaseConfigured()) return { success: false, message: 'Not authenticated' };
+    try {
+      const { error } = await supabase.from('profiles').update({ verified: true }).eq('id', userId);
+      if (error) throw error;
+      apiClient.notify();
+      return { success: true, message: 'User verified successfully' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Verification failed' };
+    }
+  },
+
+  // Fully activate an account: confirms the email in Supabase auth (so the user can
+  // log in without clicking the link) AND flips profiles.verified. Requires the
+  // service-role key, so it runs through the admin-verify-employee Edge Function.
+  async adminActivateUser(userId: string): Promise<{ success: boolean; message: string }> {
+    if (!isSupabaseConfigured() || !SUPABASE_FUNCTIONS_URL) {
+      return { success: false, message: 'Supabase not configured' };
+    }
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return { success: false, message: 'Not authenticated' };
+
+      const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/admin-verify-employee`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return { success: false, message: json.message || 'Activation failed' };
+
+      employeeService.clearCache();
+      apiClient.notify();
+      return { success: true, message: 'Account activated' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Activation failed' };
+    }
+  },
+
+  async waitForEmailVerification(
+    email: string,
+    maxWaitMinutes: number = 5,
+  ): Promise<{ verified: boolean; timeoutMs: number }> {
+    const pollIntervalMs = 10000;
+    const maxChecks = (maxWaitMinutes * 60 * 1000) / pollIntervalMs;
+    let checks = 0;
+
+    return new Promise((resolve) => {
+      const interval = setInterval(async () => {
+        checks++;
+        const verified = await verificationService.checkVerified(email);
+        if (verified) {
+          clearInterval(interval);
+          resolve({ verified: true, timeoutMs: checks * pollIntervalMs });
+          return;
+        }
+        if (checks >= maxChecks) {
+          clearInterval(interval);
+          resolve({ verified: false, timeoutMs: checks * pollIntervalMs });
+        }
+      }, pollIntervalMs);
+    });
+  },
+
+  async verifyEmailToken(token: string): Promise<{ success: boolean; email?: string; message: string }> {
+    if (!isSupabaseConfigured()) return { success: false, message: 'Supabase not configured' };
+    try {
+      // Use 'signup' type — the token was generated by resend({ type: 'signup', email })
+      const { data, error } = await supabase.auth.verifyOtp({ token_hash: token, type: 'signup' });
+      if (error) {
+        const msg = error.message.includes('expired') || error.message.includes('invalid')
+          ? 'Verification link has expired or is invalid. Please request a new one.'
+          : error.message;
+        return { success: false, message: msg };
+      }
+      // Belt-and-suspenders with the DB trigger: also set profiles.verified = true.
+      // After verifyOtp the user has a session, so RLS allows the update.
+      if (data.user) {
+        await supabase.from('profiles').update({ verified: true }).eq('id', data.user.id);
+      }
+      return { success: true, email: data.user?.email, message: 'Email verified successfully! You can now log in.' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Verification failed' };
+    }
+  },
+
+  async resendVerificationEmail(email: string): Promise<{ success: boolean; message: string }> {
+    if (!isSupabaseConfigured()) return { success: false, message: 'Supabase not configured' };
+    try {
+      // If the caller is already authenticated, check whether the email is
+      // already confirmed.  Supabase's resend API returns success without
+      // sending when the email is already confirmed, which makes users think
+      // nothing happened.  Instead, fix the profile flag and tell them to retry.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email_confirmed_at) {
+        await supabase.from('profiles').update({ verified: true }).eq('id', user.id);
+        return { success: true, message: 'Your account is already verified. Please try signing in again.' };
+      }
+      const { error } = await supabase.auth.resend({ type: 'signup', email });
+      if (error) throw error;
+      return { success: true, message: 'Verification email resent. Check your inbox!' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Failed to resend verification email' };
+    }
+  },
+};
