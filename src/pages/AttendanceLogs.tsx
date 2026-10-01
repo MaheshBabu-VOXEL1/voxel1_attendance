@@ -10,6 +10,7 @@ import { Attendance, Employee, AppConfig } from '../types';
 import { consolidateAttendance, calculatePunctuality, calculateDuration } from '../utils/attendanceUtils';
 import { AttendanceSheet } from '../components/attendance/AttendanceSheet';
 import { useToast } from '../context/ToastContext';
+import { officeHours } from '../utils/officeHours';
 
 interface AttendanceLogsProps {
   user: any;
@@ -422,11 +423,12 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
                         {emp?.department || 'Staff'}
                       </p>
                     )}
-                    <div className="flex items-center gap-4 text-slate-400">
+                    <div className="flex flex-wrap items-center gap-4 text-slate-400">
                       <div className="flex items-center gap-1.5">
                         <Clock size={12} className="text-primary" />
                         <span className="text-[10px] font-semibold uppercase tracking-tight">{log.checkIn || '--:--'} — {log.checkOut || 'Active'}</span>
                       </div>
+                      <span className="text-xs font-semibold text-primary">Total office hours: {officeHours(logs, log.employeeId, log.date)}</span>
                       <div className="flex items-center gap-1.5 truncate max-w-[150px]">
                         <MapPin size={12} className="text-rose-500" />
                         <span className="text-[10px] font-semibold uppercase tracking-tight truncate">{log.location?.address || 'Unknown'}</span>

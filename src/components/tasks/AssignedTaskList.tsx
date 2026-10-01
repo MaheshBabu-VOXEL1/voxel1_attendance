@@ -22,6 +22,7 @@ export function AssignedTaskList({ tasks, editable = false, onUpdated, emptyText
         <p className="text-sm font-semibold text-slate-900">{!editable ? task.employee_name : task.self_created ? 'Sent to ' + task.manager_name : 'Assigned by ' + task.manager_name}</p>
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${taskStatusStyles[task.status].badge}`}>{statusLabel[task.status]}</span>
       </div>
+      <p className="text-xs font-semibold text-primary">Project: {task.project_name || 'No project'}</p>
       <p className="whitespace-pre-wrap break-words text-sm text-slate-800">{task.description}</p>
       <p className="text-xs text-slate-500">{task.self_created ? 'Sent' : 'Assigned'} {new Date(task.created).toLocaleString()}</p>
       {editable && <fieldset disabled={saving !== null} className="flex flex-wrap gap-3">

@@ -7,6 +7,7 @@ export interface AssignedTask {
   employee_name: string;
   manager_name: string;
   description: string;
+  project_name?: string | null;
   status: TaskStatus;
   created: string;
   updated: string;
@@ -26,8 +27,9 @@ export const assignedTaskService = {
     if (error) throw new Error(error.message);
     return data || [];
   },
-  async assign(employeeId: string, description: string): Promise<AssignedTask> {
-    const { data, error } = await supabase.rpc('assign_employee_task', { p_employee_id: employeeId, p_description: description.trim() });
+  async assign(employeeId: string, description: string, projectName: string): Promise<AssignedTask> {
+    if (!projectName.trim()) throw new Error('Choose or add a project.');
+    const { data, error } = await supabase.rpc('assign_employee_task', { p_employee_id: employeeId, p_description: description.trim(), p_project_name: projectName.trim() });
     if (error) throw new Error(error.message);
     return data;
   },

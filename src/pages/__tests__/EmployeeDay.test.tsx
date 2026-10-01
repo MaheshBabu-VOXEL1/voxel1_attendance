@@ -7,7 +7,7 @@ vi.mock('../../context/ThemeContext', () => ({ useTheme: () => ({ darkMode: fals
 vi.mock('../../context/SubscriptionContext', () => ({ useSubscription: () => ({ canPerformAction: () => true }) }));
 vi.mock('../../services/assignedTask.service', () => ({ assignedTaskService: { setStatus: mocks.status } }));
 vi.mock('../../services/employeeService', () => ({ employeeService: { applyForLeave: mocks.leave } }));
-vi.mock('../../hooks/useAssignedTasks', () => ({ useAssignedTasks: () => ({ loading: false, error: '', refresh: mocks.refresh, tasks: [{id:'task1',description:'Review model',status:'START',completed_at:null}, {id:'task2',description:'Old drawing',status:'END',completed_at:'2020-01-01T10:00:00Z'}] }) }));
+vi.mock('../../hooks/useAssignedTasks', () => ({ useAssignedTasks: () => ({ loading: false, error: '', refresh: mocks.refresh, tasks: [{id:'task1',description:'Review model',project_name:'Vyoma',created:'2026-10-01T09:00:00Z',status:'START',completed_at:null}, {id:'task2',description:'Old drawing',status:'END',completed_at:'2020-01-01T10:00:00Z'}] }) }));
 vi.mock('../../services/hrService', () => ({ hrService: {
   getLeaveBalance: async () => ({ANNUAL:14,CASUAL:10,SICK:14}), getLeaves: async () => [],
   getActiveAttendance: async () => ({checkIn:'09:00'}), getAttendance: async () => [],
@@ -29,6 +29,20 @@ describe('employee reference screen', () => {
     fireEvent.click(screen.getByText('Show more (1 finished earlier)')); expect(screen.getByText('Old drawing')).toBeTruthy();
     expect(screen.queryByRole('navigation')).toBeNull();
   });
+  it('shows project names and searches by project or task', async () => {
+    render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
+    await screen.findByText('Checked in');
+    expect(screen.getByText('Project: Vyoma')).toBeInTheDocument();
+    expect(screen.getByText('1 Oct 2026')).toHaveAttribute('datetime', '2026-10-01T09:00:00Z');
+    const search = screen.getByRole('searchbox');
+    fireEvent.change(search, {target:{value:' VYOMA '}});
+    expect(screen.getByText('Review model')).toBeInTheDocument();
+    expect(screen.queryByText('Old drawing')).not.toBeInTheDocument();
+    fireEvent.change(search, {target:{value:'drawing'}});
+    expect(screen.getByText('Old drawing')).toBeInTheDocument();
+    expect(screen.getByText('Project: No project')).toBeInTheDocument();
+    expect(screen.queryByText('Review model')).not.toBeInTheDocument();
+  });
   it('persists pause and surfaces failures without claiming success', async () => {
     mocks.status.mockRejectedValueOnce(new Error('Connection failed'));
     render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
@@ -40,8 +54,20 @@ describe('employee reference screen', () => {
     render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
     await screen.findByText('Checked in'); fireEvent.click(screen.getByText('Apply leave'));
     fireEvent.click(screen.getByText('Today')); fireEvent.click(screen.getByRole('switch',{name:'Half day'}));
+    const note = screen.getByRole('textbox', {name:'Note for your manager (required)'});
+    const send = screen.getByRole('button', {name:'Send request'});
+    expect(note).toBeRequired();
+    expect(send).toBeDisabled();
+    fireEvent.click(send);
+    expect(mocks.leave).not.toHaveBeenCalled();
+    fireEvent.change(note, {target:{value:'   '}});
+    expect(send).toBeDisabled();
+    fireEvent.click(send);
+    expect(mocks.leave).not.toHaveBeenCalled();
+    fireEvent.change(note, {target:{value:' Family function '}});
+    expect(send).toBeEnabled();
     fireEvent.click(screen.getByText('Send request'));
-    await waitFor(() => expect(mocks.leave).toHaveBeenCalledWith(expect.objectContaining({type:'ANNUAL',totalDays:0.5}),{id:'me'}));
+    await waitFor(() => expect(mocks.leave).toHaveBeenCalledWith(expect.objectContaining({type:'ANNUAL',totalDays:0.5,reason:'Family function'}),{id:'me'}));
     await screen.findByText('Annual leave request sent');
   });
 });
