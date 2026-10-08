@@ -16,6 +16,13 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-10-08',
+    title: 'Company leave types on the employee home screen',
+    entries: [
+      { type: 'fix', description: 'The employee home screen shows the leave types and balances the company has set (for example Casual & Sick and Paid) instead of a fixed Annual, Casual and Sick list. Leave forms start on a valid leave type.' },
+    ],
+  },
+  {
+    date: '2026-10-08',
     title: 'Unassigned tasks',
     entries: [
       { type: 'feature', description: 'Managers can save tasks with only a project and description during the day. Person and due date are optional; tasks without a person go to an Unassigned list that only their creator sees, where each can be given a person and due date later. Employees see a task only once it is assigned to them.' },

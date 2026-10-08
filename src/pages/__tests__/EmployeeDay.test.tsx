@@ -9,7 +9,8 @@ vi.mock('../../services/assignedTask.service', () => ({ assignedTaskService: { s
 vi.mock('../../services/employeeService', () => ({ employeeService: { applyForLeave: mocks.leave } }));
 vi.mock('../../hooks/useAssignedTasks', () => ({ useAssignedTasks: () => ({ loading: false, error: '', refresh: mocks.refresh, tasks: [{id:'task1',description:'Review model',project_name:'Vyoma',created:'2026-10-01T09:00:00Z',status:'START',completed_at:null}, {id:'task2',description:'Old drawing',status:'END',completed_at:'2020-01-01T10:00:00Z'}] }) }));
 vi.mock('../../services/hrService', () => ({ hrService: {
-  getLeaveBalance: async () => ({ANNUAL:14,CASUAL:10,SICK:14}), getLeaves: async () => [],
+  getLeaveBalance: async () => ({CASUAL_SICK:12,PAID:7}), getLeaves: async () => [],
+  getLeaveTypes: async () => [{id:'CASUAL_SICK',name:'Casual & Sick Leave',color:'',hasBalance:true},{id:'PAID',name:'Paid Leave',color:'',hasBalance:true},{id:'UNPAID',name:'Unpaid Leave',color:'',hasBalance:false}],
   getActiveAttendance: async () => ({checkIn:'09:00'}), getAttendance: async () => [],
   getConfig: async () => ({workingDays:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']}),
   resolveShiftForEmployee: async () => null, getHolidays: async () => [],
@@ -28,6 +29,14 @@ describe('employee reference screen', () => {
     expect(screen.queryByText('Old drawing')).toBeNull();
     fireEvent.click(screen.getByText('Show more (1 finished earlier)')); expect(screen.getByText('Old drawing')).toBeTruthy();
     expect(screen.queryByRole('navigation')).toBeNull();
+  });
+  it('shows the organization leave types and balances, not a fixed Annual/Casual/Sick list', async () => {
+    render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
+    await screen.findByText('Checked in');
+    const bal = screen.getByText('Leave balance').closest('section')!;
+    await waitFor(() => expect(bal.textContent).toContain('Casual & Sick'));
+    expect(bal.textContent).toContain('12'); expect(bal.textContent).toContain('Paid'); expect(bal.textContent).toContain('7');
+    expect(bal.textContent).not.toContain('Annual'); expect(bal.textContent).not.toContain('Unpaid');
   });
   it('shows project names and searches by project or task', async () => {
     render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
@@ -67,7 +76,7 @@ describe('employee reference screen', () => {
     fireEvent.change(note, {target:{value:' Family function '}});
     expect(send).toBeEnabled();
     fireEvent.click(screen.getByText('Send request'));
-    await waitFor(() => expect(mocks.leave).toHaveBeenCalledWith(expect.objectContaining({type:'ANNUAL',totalDays:0.5,reason:'Family function'}),{id:'me'}));
-    await screen.findByText('Annual leave request sent');
+    await waitFor(() => expect(mocks.leave).toHaveBeenCalledWith(expect.objectContaining({type:'CASUAL_SICK',totalDays:0.5,reason:'Family function'}),{id:'me'}));
+    await screen.findByText('Casual & Sick leave request sent');
   });
 });

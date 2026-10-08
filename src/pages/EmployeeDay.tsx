@@ -4,14 +4,13 @@ import { hrService } from '../services/hrService';
 import { employeeService } from '../services/employeeService';
 import { assignedTaskService, AssignedTask, TaskStatus } from '../services/assignedTask.service';
 import { useAssignedTasks } from '../hooks/useAssignedTasks';
-import { Attendance, LeaveBalance, LeaveRequest } from '../types';
+import { Attendance, CustomLeaveType, LeaveBalance, LeaveRequest } from '../types';
+import { DEFAULT_LEAVE_TYPES } from '../constants';
 import { ymd } from '../utils/attendanceSheet';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import './EmployeeDay.css';
 
-const TYPES = ['ANNUAL', 'CASUAL', 'SICK'];
-const label = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 const date = (s: string) => new Date(`${s}T12:00:00`);
 const short = (s: string) => date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
@@ -33,7 +32,10 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
   const [workingDays, setWorkingDays] = useState<string[]>([]);
   const [holidays, setHolidays] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
-  const [type, setType] = useState('ANNUAL');
+  const [leaveTypes, setLeaveTypes] = useState<CustomLeaveType[]>(DEFAULT_LEAVE_TYPES.filter(t => t.hasBalance));
+  const TYPES = leaveTypes.map(t => t.id);
+  const label = (id: string) => (leaveTypes.find(t => t.id === id)?.name || id).replace(/ Leave$/, '');
+  const [type, setType] = useState('');
   const [when, setWhen] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -50,12 +52,15 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
     let alive = true;
     const load = async () => {
       try {
-        const [bal, requests, active, logs, config, shift, hols] = await Promise.all([
+        const [bal, requests, active, logs, config, shift, hols, types] = await Promise.all([
           hrService.getLeaveBalance(user.id), hrService.getLeaves(), hrService.getActiveAttendance(user.id),
           hrService.getAttendance({ employeeId: user.id, since: today, until: today }), hrService.getConfig(),
           hrService.resolveShiftForEmployee(user.id, user.shiftId), hrService.getHolidays(),
+          hrService.getLeaveTypes().catch(() => DEFAULT_LEAVE_TYPES),
         ]);
         if (!alive) return;
+        const withBalance = types.filter(t => t.hasBalance);
+        if (withBalance.length) setLeaveTypes(withBalance);
         setBalance(bal); setLeaves(requests.filter(l => l.employeeId === user.id));
         setAttendance(active || logs.filter(l => l.date === today).sort((a,b) => (b.checkIn || '').localeCompare(a.checkIn || ''))[0]);
         setWorkingDays((shift?.workingDays || config.workingDays || []).map(d => d.slice(0,3).toUpperCase()));
@@ -81,7 +86,7 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
     return () => { document.body.style.overflow = previous; };
   }, [open]);
   const close = () => { sheet.current?.close(); setOpen(false); apply.current?.focus(); };
-  const showLeave = () => { setType('ANNUAL'); setWhen(''); setFrom(''); setTo(''); setHalf(false); setNote(''); setFormError(''); setOpen(true); };
+  const showLeave = () => { setType(TYPES[0] || ''); setWhen(''); setFrom(''); setTo(''); setHalf(false); setNote(''); setFormError(''); setOpen(true); };
   const start = when === 'today' ? today : when === 'tomorrow' ? tomorrow : from;
   const end = when === 'pick' ? to || from : start;
   let days = 0;
@@ -92,7 +97,7 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
     if (half && start === end && days) days = 0.5;
   }
   const remaining = Number(balance?.[type] || 0);
-  const validation = !start ? '' : start < today ? 'Choose today or a future date.' : end < start ? 'End date is before the start date.' : !days ? 'These dates fall on non-working days.' : leaves.some(l => l.status !== 'REJECTED' && l.startDate <= end && l.endDate >= start) ? 'You already have a leave request on these dates.' : days > remaining ? `Only ${remaining} ${type.toLowerCase()} days left.` : '';
+  const validation = !start ? '' : start < today ? 'Choose today or a future date.' : end < start ? 'End date is before the start date.' : !days ? 'These dates fall on non-working days.' : leaves.some(l => l.status !== 'REJECTED' && l.startDate <= end && l.endDate >= start) ? 'You already have a leave request on these dates.' : days > remaining ? `Only ${remaining} ${label(type).toLowerCase()} days left.` : '';
   const submitLeave = async () => {
     if (!canWrite || busy || !days || validation || !note.trim()) return;
     setBusy('leave'); setFormError('');
@@ -139,8 +144,8 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
       {!query.trim() && tasks.some(old) && <button className={`more${history ? ' open' : ''}`} aria-expanded={history} onClick={() => setHistory(!history)}>{history ? 'Hide finished tasks' : `Show more (${tasks.filter(old).length} finished earlier)`}<ChevronDown size={16}/></button>}
     </main>
     {open && <dialog ref={sheet} className="sheet show" aria-labelledby="sheetTitle" onCancel={e => { e.preventDefault(); if (busy !== 'leave') close(); }} onClick={e => { if (e.target === e.currentTarget && busy !== 'leave') { const r=e.currentTarget.getBoundingClientRect(); if(e.clientY < r.top || e.clientX < r.left || e.clientX > r.right) close(); } }}><div className="grab"/><div className="sheet-h"><h2 id="sheetTitle">Apply leave</h2><button className="x" aria-label="Close" disabled={busy === 'leave'} onClick={close}><X size={18}/></button></div>
-      <div className="fl"><span className="lab">Type</span><div className="opts c3">{TYPES.map(t => <button key={t} className="opt" aria-pressed={type===t} onClick={() => setType(t)}><b>{label(t)}</b><span>{Number(balance?.[t] || 0)} left</span></button>)}</div></div>
-      <div className="fl"><span className="lab">When</span><div className="opts c3">{['today','tomorrow','pick'].map(w => <button key={w} className="opt" aria-pressed={when===w} onClick={() => {setWhen(w); setHalf(false);}}><b>{w==='pick' ? 'Pick dates' : label(w)}</b><span>{w==='pick' ? 'From – to' : short(w==='today' ? today : tomorrow)}</span></button>)}</div>
+      <div className="fl"><span className="lab">Type</span><div className={`opts c${Math.min(Math.max(TYPES.length, 1), 3)}`}>{TYPES.map(t => <button key={t} className="opt" aria-pressed={type===t} onClick={() => setType(t)}><b>{label(t)}</b><span>{Number(balance?.[t] || 0)} left</span></button>)}</div></div>
+      <div className="fl"><span className="lab">When</span><div className="opts c3">{['today','tomorrow','pick'].map(w => <button key={w} className="opt" aria-pressed={when===w} onClick={() => {setWhen(w); setHalf(false);}}><b>{w==='pick' ? 'Pick dates' : w==='today' ? 'Today' : 'Tomorrow'}</b><span>{w==='pick' ? 'From – to' : short(w==='today' ? today : tomorrow)}</span></button>)}</div>
       {when === 'pick' && <div className="dates show"><div className="field"><label htmlFor="leave-from">From</label><input id="leave-from" type="date" min={today} value={from} onChange={e => {setFrom(e.target.value);setHalf(false);}}/></div><div className="field"><label htmlFor="leave-to">To</label><input id="leave-to" type="date" min={from || today} value={to} onChange={e => {setTo(e.target.value);setHalf(false);}}/></div></div>}
       <div className="switch-row"><div><b>Half day</b><span>Single-day leave only</span></div><button className="sw" role="switch" aria-label="Half day" aria-checked={half} disabled={!start || start!==end} onClick={() => setHalf(!half)}/></div></div>
       <div className="fl"><label className="lab" htmlFor="leave-note">Note for your manager (required)</label><textarea id="leave-note" className="note" rows={1} required placeholder="e.g. Family function" value={note} onChange={e => setNote(e.target.value)}/></div>

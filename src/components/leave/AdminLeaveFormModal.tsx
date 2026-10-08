@@ -37,7 +37,10 @@ const AdminLeaveFormModal: React.FC<Props> = ({ mode, leave, employees, onClose,
   const [totalDays, setTotalDays] = useState(leave?.totalDays || 0);
 
   useEffect(() => {
-    hrService.getLeaveTypes().then(setLeaveTypes).catch((err) => {
+    hrService.getLeaveTypes().then(lt => {
+      setLeaveTypes(lt);
+      setType(prev => lt.some(t => t.id === prev) ? prev : (lt.find(t => t.hasBalance) || lt[0])?.id || prev);
+    }).catch((err) => {
       console.error('Failed to load leave types:', err);
     });
   }, []);

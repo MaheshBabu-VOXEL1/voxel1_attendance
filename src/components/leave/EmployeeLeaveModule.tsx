@@ -68,6 +68,7 @@ const EmployeeLeaveModule: React.FC<Props> = ({ user, balance, history, onRefres
       setHolidays(hols);
       setConfig(cfg);
       setLeaveTypes(lt);
+      setFormData(prev => lt.some(t => t.id === prev.type) ? prev : { ...prev, type: (lt.find(t => t.hasBalance) || lt[0])?.id || prev.type });
       const shift = await hrService.resolveShiftForEmployee(user.id, user.shiftId);
       setEmployeeShift(shift);
     };
