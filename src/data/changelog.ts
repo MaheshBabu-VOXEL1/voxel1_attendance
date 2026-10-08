@@ -16,6 +16,13 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-10-08',
+    title: 'Employee name in the top bar',
+    entries: [
+      { type: 'improvement', description: 'The employee home screen shows the signed-in employee\'s name in the top-right corner instead of the date, which is already shown in the page heading.' },
+    ],
+  },
+  {
+    date: '2026-10-08',
     title: 'Company leave types on the employee home screen',
     entries: [
       { type: 'fix', description: 'The employee home screen shows the leave types and balances the company has set (for example Casual & Sick and Paid) instead of a fixed Annual, Casual and Sick list. Leave forms start on a valid leave type.' },

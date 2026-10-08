@@ -48,6 +48,7 @@ button{cursor:pointer}
 .lockup .wm b{font-size:14px;font-weight:800;letter-spacing:.16em;color:var(--navy)}
 .lockup .wm span{display:none}
 .chip-date{font-size:12.5px;font-weight:600;color:var(--muted)}
+.chip-name{max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink,inherit)}
 
 /* Hero */
 .hero{margin-top:14px}

@@ -38,6 +38,11 @@ describe('employee reference screen', () => {
     expect(bal.textContent).toContain('12'); expect(bal.textContent).toContain('Paid'); expect(bal.textContent).toContain('7');
     expect(bal.textContent).not.toContain('Annual'); expect(bal.textContent).not.toContain('Unpaid');
   });
+  it('shows the signed-in employee name in the top bar', async () => {
+    render(<EmployeeDay user={{id:'me', name:'Divya Kallepalli'}} onNavigate={vi.fn()}/>);
+    await screen.findByText('Checked in');
+    expect(document.querySelector('.appbar')!.textContent).toContain('Divya Kallepalli');
+  });
   it('shows project names and searches by project or task', async () => {
     render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
     await screen.findByText('Checked in');
