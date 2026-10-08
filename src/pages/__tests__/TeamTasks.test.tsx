@@ -14,11 +14,11 @@ describe('manager task assignments', () => {
       { id: 'other', name: 'Other Employee', role: 'EMPLOYEE', lineManagerId: 'other-manager', status: 'ACTIVE' },
     ] as any);
   });
-  it('assigns a task to a direct report and opens progress', async () => {
+  it('lists every active employee, not only direct reports, and opens progress', async () => {
     vi.mocked(assignedTaskService.assign).mockResolvedValue({ id: 'task' } as any);
     render(<TeamTasks user={{ id: 'manager', role: 'MANAGER' } as any} />);
     await screen.findByRole('option', { name: 'My Employee' });
-    expect(screen.queryByRole('option', { name: 'Other Employee' })).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Other Employee' })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Person'), { target: { value: 'mine' } });
     fireEvent.change(screen.getByLabelText('Project Selection'), { target: { value: '__new__' } });
     fireEvent.change(screen.getByLabelText('New project name'), { target: { value: ' Tower A ' } });
