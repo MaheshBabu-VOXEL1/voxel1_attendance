@@ -43,8 +43,9 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
   useEffect(() => {
     let active = true;
     employeeService.getEmployees().then(rows => {
-      // Managers can assign to any active employee in the organization, not only direct reports.
-      if (active) setEmployees(rows.filter(e => e.role === 'EMPLOYEE' && e.status !== 'INACTIVE'));
+      // Managers can assign to any active employee in the organization, not only direct reports. A–Z for quick picking.
+      if (active) setEmployees(rows.filter(e => e.role === 'EMPLOYEE' && e.status !== 'INACTIVE')
+        .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' })));
     }).catch(e => active && setFormError(e.message)).finally(() => active && setEmployeesLoading(false));
     return () => { active = false; };
   }, [user.id, user.role]);

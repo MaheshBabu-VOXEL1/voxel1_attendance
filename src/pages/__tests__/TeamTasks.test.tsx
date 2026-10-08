@@ -14,6 +14,18 @@ describe('manager task assignments', () => {
       { id: 'other', name: 'Other Employee', role: 'EMPLOYEE', lineManagerId: 'other-manager', status: 'ACTIVE' },
     ] as any);
   });
+  it('lists people in alphabetical order', async () => {
+    vi.mocked(employeeService.getEmployees).mockResolvedValue([
+      { id: 'k', name: 'Kesari', role: 'EMPLOYEE', status: 'ACTIVE' },
+      { id: 'a', name: 'ahmad Ali', role: 'EMPLOYEE', status: 'ACTIVE' },
+      { id: 'u', name: 'Uday', role: 'EMPLOYEE', status: 'ACTIVE' },
+      { id: 'b', name: 'Abhinay', role: 'EMPLOYEE', status: 'ACTIVE' },
+    ] as any);
+    render(<TeamTasks user={{ id: 'manager', role: 'MANAGER' } as any} />);
+    await screen.findByRole('option', { name: 'Kesari' });
+    const names = within(screen.getByLabelText('Person')).getAllByRole('option').map(o => o.textContent);
+    expect(names).toEqual(['Unassigned (choose later)', 'Abhinay', 'ahmad Ali', 'Kesari', 'Uday']);
+  });
   it('lists every active employee, not only direct reports, and opens progress', async () => {
     vi.mocked(assignedTaskService.assign).mockResolvedValue({ id: 'task' } as any);
     render(<TeamTasks user={{ id: 'manager', role: 'MANAGER' } as any} />);
