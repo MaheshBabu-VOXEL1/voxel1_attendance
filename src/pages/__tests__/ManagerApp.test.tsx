@@ -44,7 +44,7 @@ const user = { id: 'mgr', name: 'Test Manager', role: 'MANAGER', email: 'tm@exam
 describe('manager app', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('shows the three tabs, open tasks grouped by date, and the pending-leave badge', async () => {
+  it('shows the Tasks, Leaves and Attendance tabs, open tasks grouped by date, and the pending-leave badge', async () => {
     render(<ManagerApp user={user} />);
     expect(screen.getByRole('button', { name: /Tasks/ })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText('3 open tasks')).toBeInTheDocument();
@@ -70,20 +70,33 @@ describe('manager app', () => {
     expect(nav).toHaveBeenCalledWith('attendance-finish');
   });
 
-  it('shows who is present, late and not checked in on the Attendance tab', async () => {
+  it('shows the attendance table with KPIs, late check-ins and who is not in', async () => {
     vi.mocked(hrService.getHolidays).mockResolvedValueOnce([]);
     vi.mocked(hrService.getAttendance).mockImplementation(async (o: any) => o?.employeeId ? [] : [
       { id: 'a1', employeeId: 'e1', date: today, checkIn: '09:40', status: 'PRESENT' } as any,
     ]);
     render(<ManagerApp user={user} onNavigate={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));
-    const present = await screen.findByText('In 09:40 · Still in');
-    expect(present.closest('.rw')!.textContent).toContain('Divya Kallepalli');
-    expect(present.closest('.rw')!.textContent).toContain('Late');
-    const absent = screen.getByRole('heading', { name: 'Not checked in' }).parentElement!.nextElementSibling!;
-    expect(absent.textContent).toContain('Ravi');
-    expect(absent.textContent).not.toContain('Divya');
-    expect(absent.textContent).not.toContain('Test Manager');
+    const table = await screen.findByRole('table');
+    const rows = within(table).getAllByRole('row');
+    expect(rows[0].textContent).toBe('Team memberInOutHours');
+    const divya = rows.find(r => r.textContent!.includes('Divya Kallepalli'))!;
+    expect(divya.textContent).toContain('Late · working');
+    expect(divya.textContent).toContain('9:40');
+    expect(rows.find(r => r.textContent!.includes('Ravi'))!.textContent).toContain('Not in yet');
+    expect(table.textContent).not.toContain('Test Manager');
+    const kpis = document.querySelector('.kpis')!.textContent!;
+    expect(kpis).toContain('1/2Present'); expect(kpis).toContain('1Late'); expect(kpis).toContain('1Not in');
+    expect(screen.getByText(/Late = checked in after 9:15 am/)).toBeInTheDocument();
+    fireEvent.click(divya);
+    expect(await screen.findByText(/last 10 working days/)).toBeInTheDocument();
+    await waitFor(() => expect(hrService.getAttendance).toHaveBeenCalledWith(expect.objectContaining({ employeeId: 'e1' })));
+  });
+
+  it('moves to the previous day from the attendance table', async () => {
+    render(<ManagerApp user={user} onNavigate={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));
+    await screen.findByRole('button', { name: 'Previous day' });
     fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
     await waitFor(() => expect(hrService.getAttendance).toHaveBeenCalledWith(expect.objectContaining({ since: expect.not.stringMatching(today) })));
   });
@@ -119,11 +132,12 @@ describe('manager app', () => {
     await waitFor(() => expect(hrService.updateLeaveStatus).toHaveBeenCalledWith('l1', 'APPROVED', '', 'MANAGER'));
   });
 
-  it('adds a calendar event and shows company holidays', async () => {
+  it('shows the calendar inside Attendance and adds an event from the month header', async () => {
     render(<ManagerApp user={user} />);
-    fireEvent.click(screen.getByRole('button', { name: /Calendar/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Calendar' }));
     expect(await screen.findByText('Company day')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add event or holiday' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Client review' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add to calendar' }));
     await waitFor(() => expect(calendarService.addEvent).toHaveBeenCalledWith('Client review', today));

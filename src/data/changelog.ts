@@ -16,6 +16,13 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-10-08',
+    title: 'Attendance table for managers',
+    entries: [
+      { type: 'improvement', description: 'Manager app tabs are now Tasks, Leaves and Attendance. Attendance has a Table view (Present, Late, On leave, Not in; each person\'s In, Out and Hours for any day) and a Calendar view (leave, events and holidays). Tap a person to see their last 10 working days with days in, late count and average hours.' },
+    ],
+  },
+  {
+    date: '2026-10-08',
     title: 'Attendance tab for managers',
     entries: [
       { type: 'feature', description: 'The manager app has an Attendance tab: who is present (check-in and check-out time, Late, still in office), who is on approved leave, and who has not checked in, for today or any earlier date.' },

@@ -13,7 +13,7 @@ import './ManagerApp.css';
 
 /* Manager app: Tasks / Leaves / Calendar, built from the voxel1-manager.html design on live data. */
 
-type Route = 'tasks' | 'attendance' | 'leaves' | 'calendar';
+type Route = 'tasks' | 'leaves' | 'attendance';
 type Group = 'date' | 'person' | 'project';
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
 const MONL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -61,9 +61,8 @@ const SIC: Record<TaskStatus, React.ReactNode> = {
 };
 const NAV: [Route, string, React.ReactNode][] = [
   ['tasks', 'Tasks', <Svg w={22} sw={1.9}><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3" /></Svg>],
-  ['attendance', 'Attendance', <Svg w={22} sw={1.9}><circle cx="9" cy="8" r="4" /><path d="M2 21a7 7 0 0 1 14 0" /><path d="M16 11l2 2 4-4" /></Svg>],
   ['leaves', 'Leaves', <Svg w={22} sw={1.9}><path d="M8 7V3M16 7V3" /><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8.5 14.5l2.3 2.3 4.7-4.8" /></Svg>],
-  ['calendar', 'Calendar', <Svg w={22} sw={1.9}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></Svg>],
+  ['attendance', 'Attendance', <Svg w={22} sw={1.9}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Svg>],
 ];
 
 interface MenuItem { v: string; label: string; sub?: string; lead?: React.ReactNode; on?: boolean; muted?: boolean; sep?: boolean }
@@ -171,7 +170,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   }, [pop]);
 
   // ---------- sheet ----------
-  const [sheet, setSheet] = useState<null | { kind: 'task'; id: string } | { kind: 'event' } | { kind: 'account' }>(null);
+  const [sheet, setSheet] = useState<null | { kind: 'task'; id: string } | { kind: 'event' } | { kind: 'account' } | { kind: 'person'; id: string }>(null);
   // Per-screen state lives here (not inside the screen functions) so it survives re-renders.
   const [cpP, setCpP] = useState('');
   const [newProj, setNewProj] = useState(false);
@@ -189,6 +188,9 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [calM, setCalM] = useState(() => new Date().getMonth());
   const [selDay, setSelDay] = useState(() => ymd(new Date()));
   const [attDate, setAttDate] = useState(() => ymd(new Date()));
+  const [attView, setAttView] = useState<'table' | 'calendar'>('table');
+  const [personRows, setPersonRows] = useState<Attendance[]>([]);
+  const [personLoading, setPersonLoading] = useState(false);
   const [sheetText, setSheetText] = useState('');
   const [evK, setEvK] = useState<'ev' | 'hd'>('ev');
   const [evTitle, setEvTitle] = useState('');
@@ -198,14 +200,24 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const openTask = (id: string) => { setSheetText(allTasks.find(t => t.id === id)?.description || ''); setSheet({ kind: 'task', id }); };
   const openEvent = () => { setEvK('ev'); setEvTitle(''); setEvDate(selDay); setSheet({ kind: 'event' }); };
   useEffect(() => {
-    if (route !== 'attendance') return;
+    if (route !== 'attendance' || attView !== 'table') return;
     let alive = true;
     const load = () => { setDayLoading(true); hrService.getAttendance({ since: attDate, until: attDate })
       .then(rows => { if (alive) setDayRows(rows); }).catch(() => {}).finally(() => alive && setDayLoading(false)); };
     load();
     const timer = window.setInterval(() => { if (!document.hidden) load(); }, 60000);
     return () => { alive = false; clearInterval(timer); };
-  }, [route, attDate]);
+  }, [route, attDate, attView]);
+  // A person's last two weeks (sheet opened from the attendance table).
+  const personId = sheet?.kind === 'person' ? sheet.id : '';
+  useEffect(() => {
+    if (!personId) return;
+    let alive = true;
+    setPersonLoading(true); setPersonRows([]);
+    hrService.getAttendance({ employeeId: personId, since: ymd(addDays(new Date(), -30)), until: ymd(new Date()) })
+      .then(rows => { if (alive) setPersonRows(rows); }).catch(() => {}).finally(() => alive && setPersonLoading(false));
+    return () => { alive = false; };
+  }, [personId]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key !== 'Escape') return; if (pop) setPop(null); else setSheet(null); };
     document.addEventListener('keydown', key); return () => document.removeEventListener('keydown', key);
@@ -270,9 +282,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       {loadError && <p className="alert" role="alert">{loadError}</p>}
       {AttendanceCard()}
       {route === 'tasks' && TasksView()}
-      {route === 'attendance' && AttendanceView()}
       {route === 'leaves' && LeavesView()}
-      {route === 'calendar' && CalendarView()}
+      {route === 'attendance' && AttendanceView()}
     </main>
     <nav className="nav" aria-label="Main"><div className="nav-in">
       {NAV.map(([id, label, icon]) => <button key={id} aria-current={route === id ? 'page' : undefined} onClick={() => { setRoute(id); setPop(null); window.scrollTo(0, 0); }}>
@@ -297,6 +308,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       {sheet?.kind === 'task' && TaskSheet(sheet.id)}
       {sheet?.kind === 'event' && EventSheet()}
       {sheet?.kind === 'account' && AccountSheet()}
+      {sheet?.kind === 'person' && PersonSheet(sheet.id)}
     </div>
     <div className={`toast${toast ? ' show' : ''}`} role="status"><span>{toast?.msg}</span>
       {toast?.undo && <button onClick={() => { const u = toast.undo!; setToast(null); u(); }}>Undo</button>}</div>
@@ -558,10 +570,10 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       upcoming.push(<div className="agd" key={`d-${ds}`}>{dshort(ds)}</div>, ...its.map(agRow));
     }
     return <>
-      <div className="ph"><div><h1>Calendar</h1><p>Approved leave, events and holidays</p></div><button className="btn pri" onClick={openEvent}>{I.plus}Add</button></div>
       <div className="card">
         <div className="ch" style={{ padding: '10px 10px 0 16px' }}><h2>{MONL[calM]} {calY}</h2>
-          <div className="n"><button className="ibtn" aria-label="Previous month" onClick={() => move(-1)}>{I.l}</button>
+          <div className="n"><button className="ibtn" aria-label="Add event or holiday" style={{ color: 'var(--steel)' }} onClick={openEvent}>{I.plus}</button>
+            <button className="ibtn" aria-label="Previous month" onClick={() => move(-1)}>{I.l}</button>
             <button className="btn ghost" style={{ height: 36, padding: '0 10px' }} onClick={() => move(0)}>Today</button>
             <button className="ibtn" aria-label="Next month" onClick={() => move(1)}>{I.r}</button></div></div>
         <div className="grid">
@@ -608,58 +620,101 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     </>;
   }
 
+  // ---------- attendance: Table / Calendar ----------
+  function toMin(t?: string) { if (!t) return null; const [h, m] = t.split(':').map(Number); return h * 60 + m; }
+  function hm(m: number, ampm = false) { const h = Math.floor(m / 60), mm = m % 60; return `${(h % 12) || 12}:${String(mm).padStart(2, '0')}${ampm ? (h < 12 ? ' am' : ' pm') : ''}`; }
+  function dur(m: number) { return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; }
+  function lateAfter() { return (toMin(officeStart) ?? 540) + lateGrace; }
+  type AttDay = { k: 'done' | 'in' | 'leave' | 'absent' | 'notyet' | 'future' | 'we' | 'hol'; inM?: number; outM?: number; late?: boolean; worked?: number; short?: boolean; leaveType?: string; hol?: string };
+  /** One employee on one day: first check-in, last check-out, hours across all sessions. */
+  function attOf(empId: string, d: string, rows: Attendance[]): AttDay {
+    const rs = rows.filter(r => r.employeeId === empId && r.date === d && r.checkIn).sort((a, b) => (a.checkIn || '').localeCompare(b.checkIn || ''));
+    if (rs.length) {
+      const now = new Date(), nowM = now.getHours() * 60 + now.getMinutes();
+      const open = rs.some(r => !r.checkOut), inM = toMin(rs[0].checkIn)!;
+      const outM = open ? undefined : Math.max(...rs.map(r => toMin(r.checkOut) ?? 0));
+      const worked = rs.reduce((t, r) => { const a = toMin(r.checkIn)!, b = r.checkOut ? toMin(r.checkOut)! : d === T0 ? nowM : a; return t + Math.max(0, b - a); }, 0);
+      const late = rs.some(r => r.status === 'LATE') || inM > lateAfter();
+      const k = open && d === T0 ? 'in' : 'done';
+      return { k, inM, outM, late, worked, short: k === 'done' && !open && worked < 480 };
+    }
+    const hol = holidayOn(d)[0];
+    if (!isWk(parse(d))) return { k: 'we' };
+    if (hol) return { k: 'hol', hol: hol.name };
+    const lv = leaves.find(l => l.employeeId === empId && l.status === 'APPROVED' && l.startDate <= d && l.endDate >= d);
+    if (lv) return { k: 'leave', leaveType: lv.type };
+    if (d > T0) return { k: 'future' };
+    return { k: d === T0 ? 'notyet' : 'absent' };
+  }
+  function attStatus(a: AttDay): [string, string] {
+    return a.k === 'leave' ? [`${typeName(a.leaveType!)} leave`, 'mu'] : a.k === 'absent' ? ['Absent', 'bad'] : a.k === 'notyet' ? ['Not in yet', 'mu']
+    : a.k === 'in' ? [a.late ? 'Late · working' : 'Working', a.late ? 'warn' : 'info'] : a.k === 'done' ? [a.late ? 'Late' : 'Present', a.late ? 'warn' : 'ok']
+    : a.k === 'hol' ? ['Holiday', 'mu'] : a.k === 'we' ? ['Weekend', 'mu'] : ['Upcoming', 'mu'];
+  }
+  function openPerson(id: string) { setSheet({ kind: 'person', id }); }
+
   function AttendanceView() {
-    const d = attDate, day = parse(d), working = isWk(day), hols = holidayOn(d);
-    // One line per employee: first check-in, last check-out, still in if any session is open.
-    const byEmp = new Map<string, Attendance[]>();
-    dayRows.filter(r => r.date === d && r.checkIn).forEach(r => byEmp.set(r.employeeId, [...(byEmp.get(r.employeeId) || []), r]));
-    const toMin = (t?: string) => { if (!t) return null; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-    const lateAfter = (toMin(officeStart) ?? 540) + lateGrace;
-    const present = employees.filter(e => byEmp.has(e.id)).map(e => {
-      const rs = [...byEmp.get(e.id)!].sort((a, b) => (a.checkIn || '').localeCompare(b.checkIn || ''));
-      const first = rs[0], open = rs.some(r => !r.checkOut);
-      const lastOut = open ? undefined : rs.map(r => r.checkOut || '').sort().pop();
-      const late = rs.some(r => r.status === 'LATE') || (toMin(first.checkIn)! > lateAfter);
-      return { e, in: first.checkIn!, out: lastOut, open, late };
-    }).sort((a, b) => a.in.localeCompare(b.in));
-    const leaveOf = (id: string) => leaves.find(l => l.employeeId === id && l.status === 'APPROVED' && l.startDate <= d && l.endDate >= d);
-    const onLeaveList = employees.filter(e => !byEmp.has(e.id) && leaveOf(e.id));
-    const missing = employees.filter(e => !byEmp.has(e.id) && !leaveOf(e.id));
-    const lateCount = present.filter(p => p.late).length;
-    const off = !working || hols.length > 0;
-    const shift = (n: number) => setAttDate(ymd(addDays(day, n)));
+    const head = <div className="ph"><div><h1>Attendance</h1><p>{attView === 'table' ? 'Daily check-in and check-out' : 'Leave, events and holidays'}</p></div>
+      <div className="seg" role="tablist" aria-label="View">
+        <button role="tab" aria-selected={attView === 'table'} onClick={() => setAttView('table')}>Table</button>
+        <button role="tab" aria-selected={attView === 'calendar'} onClick={() => setAttView('calendar')}>Calendar</button>
+      </div></div>;
+    if (attView === 'calendar') return <>{head}{CalendarView()}</>;
+    const d = attDate, dt = parse(d), hol = holidayOn(d)[0];
+    const shift = (n: number) => { const next = ymd(addDays(dt, n)); setAttDate(n === 0 || next > T0 ? T0 : next); };
+    const nav = <div className="card ch" style={{ padding: '6px 6px 6px 14px' }}><div><h2 style={{ fontSize: 15 }}>{d === T0 ? 'Today · ' : ''}{DAY[dt.getDay()]} {dt.getDate()} {MON[dt.getMonth()]}</h2></div>
+      <div className="n"><button className="ibtn" aria-label="Previous day" onClick={() => shift(-1)}>{I.l}</button>
+        {d !== T0 && <button className="btn ghost" style={{ height: 36, padding: '0 8px' }} onClick={() => setAttDate(T0)}>Today</button>}
+        <label className="ibtn" style={{ position: 'relative', cursor: 'pointer' }} aria-label="Pick a date">{I.cal}
+          <input type="date" value={d} max={T0} onChange={e => e.target.value && setAttDate(e.target.value > T0 ? T0 : e.target.value)} style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }} /></label>
+        <button className="ibtn" aria-label="Next day" disabled={d >= T0} style={d >= T0 ? { opacity: 0.3 } : undefined} onClick={() => shift(1)}>{I.r}</button></div></div>;
+    if (!isWk(dt) || hol) return <>{head}{nav}<div className="card empty" style={{ marginTop: 12 }}>{hol ? `${hol.name} · company holiday` : 'Weekend'}. No attendance recorded.</div></>;
+    const all = employees.map(e => ({ e, a: attOf(e.id, d, dayRows) }));
+    const cnt = (f: (a: AttDay) => boolean) => all.filter(x => f(x.a)).length;
+    const pres = cnt(a => a.k === 'done' || a.k === 'in'), late = cnt(a => !!a.late), onLv = cnt(a => a.k === 'leave'), out = cnt(a => a.k === 'absent' || a.k === 'notyet');
     return <>
-      <div className="ph"><div><h1>Attendance</h1><p>{d === T0 ? 'Today' : dshort(d)} · {present.length} present{lateCount ? ` (${lateCount} late)` : ''} · {onLeaveList.length} on leave · {off ? 'day off' : `${missing.length} not checked in`}</p></div></div>
-      <div className="card"><div className="ch" style={{ padding: '6px 6px 6px 14px' }}>
-        <h2>{d === T0 ? `Today · ${dshort(d)}` : dshort(d)}</h2>
-        <div className="n"><button className="ibtn" aria-label="Previous day" onClick={() => shift(-1)}>{I.l}</button>
-          <label className="btn ghost" style={{ height: 36, padding: '0 10px', position: 'relative' }}>{I.cal}<span className="vh">Pick a date</span>
-            <input type="date" aria-label="Pick a date" value={d} max={T0} onChange={e => e.target.value && setAttDate(e.target.value)} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} /></label>
-          {d !== T0 && <button className="btn ghost" style={{ height: 36, padding: '0 10px' }} onClick={() => setAttDate(T0)}>Today</button>}
-          <button className="ibtn" aria-label="Next day" disabled={d >= T0} onClick={() => shift(1)}>{I.r}</button></div>
-      </div></div>
-      {off && <p className="small" style={{ margin: '10px 4px 0' }}>{hols.length ? `Holiday: ${hols.map(h => h.name).join(', ')}` : 'Not a working day'}. Nobody is expected to check in.</p>}
-      {dayLoading && !dayRows.length ? <p className="loading" role="status">Loading attendance…</p> : <>
-        <div className="sec"><h2>Present</h2><span>{present.length}</span></div>
-        <div className="list">{present.length ? present.map(p => <div className="rw" key={p.e.id}><span className="av sm">{ini(p.e.name)}</span>
-          <div className="t"><b>{p.e.name}</b><span>In {p.in} · {p.open ? 'Still in' : p.out ? `Out ${p.out}` : ''}</span></div>
-          {p.late ? <span className="st warn">Late</span> : p.open ? <span className="st ok">In office</span> : null}</div>)
-          : <div className="empty">Nobody has checked in{d === T0 ? ' yet' : ''}</div>}</div>
-        {onLeaveList.length > 0 && <><div className="sec"><h2>On leave</h2><span>{onLeaveList.length}</span></div>
-          <div className="list">{onLeaveList.map(e => { const l = leaveOf(e.id)!; return <div className="rw" key={e.id}><span className="av sm">{ini(e.name)}</span>
-            <div className="t"><b>{e.name}</b><span>{typeName(l.type)} leave · {range(l.startDate, l.endDate)}</span></div></div>; })}</div></>}
-        {!off && <><div className={`sec${missing.length ? ' over' : ''}`}><h2>Not checked in</h2><span>{missing.length}</span></div>
-          <div className="list">{missing.length ? missing.map(e => <div className="rw" key={e.id}><span className="av sm">{ini(e.name)}</span>
-            <div className="t"><b>{e.name}</b><span>{e.designation || 'Employee'}</span></div><span className="st bad">Absent</span></div>)
-            : <div className="empty">Everyone is accounted for</div>}</div></>}
-      </>}
+      {head}{nav}
+      <div className="kpis"><div><b>{pres}<small>/{employees.length}</small></b><span>Present</span></div><div><b className="w">{late}</b><span>Late</span></div>
+        <div><b>{onLv}</b><span>On leave</span></div><div><b className={out ? 'b' : ''}>{out}</b><span>{d === T0 ? 'Not in' : 'Absent'}</span></div></div>
+      {dayLoading && !dayRows.length ? <p className="loading" role="status">Loading attendance…</p> :
+        <div className="list" style={{ marginTop: 12 }}><table className="att"><thead><tr><th>Team member</th><th className="r">In</th><th className="r">Out</th><th className="r">Hours</th></tr></thead>
+          <tbody>{all.map(({ e, a }) => { const [st, cls] = attStatus(a); return <tr key={e.id} data-a="attPerson" tabIndex={0} onClick={() => openPerson(e.id)} onKeyDown={ev => ev.key === 'Enter' && openPerson(e.id)}>
+            <td><div className="nm"><span className="av sm">{ini(e.name)}</span><div><b>{e.name}</b><span className={`as ${cls}`}>{st}</span></div></div></td>
+            <td className={`r${a.late ? ' lt' : ''}`}>{a.inM != null ? hm(a.inM) : '—'}</td>
+            <td className="r">{a.outM != null ? hm(a.outM) : a.k === 'in' ? <span className="live">In</span> : '—'}</td>
+            <td className={`r${a.short ? ' lt' : ''}`}>{a.worked ? dur(a.worked) : '—'}</td></tr>; })}</tbody></table></div>}
+      <p className="hint">Late = checked in after {hm(lateAfter(), true)}. Hours in amber are under 8h. Tap a person to see their last two weeks.</p>
+    </>;
+  }
+
+  function PersonSheet(id: string) {
+    const e = employees.find(x => x.id === id);
+    if (!e) return null;
+    const days: { d: string; a: AttDay }[] = [];
+    for (let i = 0, cur = parse(T0); days.length < 10 && i < 31; i++, cur = addDays(cur, -1)) {
+      const d = ymd(cur);
+      if (isWk(cur) && !holidayOn(d).length) days.push({ d, a: attOf(id, d, personRows) });
+    }
+    const withHours = days.filter(x => x.a.worked), tot = withHours.reduce((t, x) => t + (x.a.worked || 0), 0), lates = days.filter(x => x.a.late).length;
+    return <>
+      <div className="grab" /><div className="sh"><h2 id="sheetT">{e.name}</h2><button className="ibtn" aria-label="Close" onClick={() => setSheet(null)}>{I.x}</button></div>
+      <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--muted)' }}>{e.designation || 'Employee'} · last 10 working days</p>
+      <div className="kpis" style={{ marginTop: 0 }}><div><b>{withHours.length}</b><span>Days in</span></div><div><b className="w">{lates}</b><span>Late</span></div>
+        <div><b>{withHours.length ? dur(Math.round(tot / withHours.length)) : '—'}</b><span>Avg hours</span></div></div>
+      {personLoading ? <p className="loading" role="status">Loading…</p> :
+        <div className="list" style={{ marginTop: 12 }}><table className="att"><thead><tr><th>Day</th><th className="r">In</th><th className="r">Out</th><th className="r">Hours</th></tr></thead>
+          <tbody>{days.map(({ d, a }) => { const [st, cls] = attStatus(a); return <tr key={d}>
+            <td><b>{dshort(d)}</b><span className={`as ${cls}`}>{st}</span></td>
+            <td className={`r${a.late ? ' lt' : ''}`}>{a.inM != null ? hm(a.inM, true) : '—'}</td>
+            <td className="r">{a.outM != null ? hm(a.outM, true) : '—'}</td>
+            <td className={`r${a.short ? ' lt' : ''}`}>{a.worked ? dur(a.worked) : '—'}</td></tr>; })}</tbody></table></div>}
     </>;
   }
 
   function AttendanceCard() {
     const active = !!attendance?.checkIn && !attendance.checkOut;
     const at = active ? attendance?.checkIn : attendance?.checkOut;
-    return <div className="att"><div className="att-l"><span className={`dot${active ? '' : ' off'}`} />
+    return <div className="mycheck"><div className="att-l"><span className={`dot${active ? '' : ' off'}`} />
       <div><b>{!attReady ? 'Loading attendance…' : active ? 'Checked in' : attendance?.checkOut ? 'Checked out' : 'Not checked in'}</b><span>{at ? `at ${at}` : 'Start your day'}</span></div></div>
       <button className={`btn att-btn ${active ? 'out' : 'in'}`} disabled={!attReady || !onNavigate}
         onClick={() => onNavigate?.(active ? 'attendance-finish' : 'attendance-quick-office')}>{active ? 'Check out' : 'Check in'}</button></div>;
