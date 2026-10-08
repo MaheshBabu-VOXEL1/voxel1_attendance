@@ -16,6 +16,14 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-10-08',
+    title: 'Monthly Excel reports',
+    entries: [
+      { type: 'feature', description: 'Managers and Admins can download a monthly Excel workbook with attendance, employee details, assigned tasks and task progress, plus a task Excel from Team Tasks.' },
+      { type: 'feature', description: 'During the last five days of each month (India time) managers see a reminder to download the monthly report. Nothing is deleted; attendance and tasks are kept.' },
+    ],
+  },
+  {
+    date: '2026-10-08',
     title: 'Readable project IDs',
     entries: [
       { type: 'improvement', description: 'Project UIDs now display permanent numbers such as 1, 2 and 3 instead of long UUIDs. Tasks in the same project share the same number.' },

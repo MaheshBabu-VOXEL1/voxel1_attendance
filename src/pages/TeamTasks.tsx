@@ -1,13 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { User, Employee } from '../types';
 import { employeeService } from '../services/employee.service';
-import { assignedTaskService, statusLabel, TaskStatus } from '../services/assignedTask.service';
+import { assignedTaskService, statusLabel, TaskStatus, TaskProject } from '../services/assignedTask.service';
 import { useAssignedTasks } from '../hooks/useAssignedTasks';
 import { AssignedTaskList } from '../components/tasks/AssignedTaskList';
+import { Download } from 'lucide-react';
+import { MonthlyReportDownload } from '../components/reports/MonthlyReportDownload';
+import { downloadWorkbook, indiaDate, taskSheet } from '../utils/monthlyReports';
 
 export default function TeamTasks({ user, initialTab }: { user: User; initialTab?: string }) {
   const [tab, setTab] = useState<'ASSIGN' | 'PROGRESS' | 'EMPLOYEE'>(initialTab === 'PROGRESS' || initialTab === 'EMPLOYEE' ? initialTab : 'ASSIGN');
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [savedProjects, setSavedProjects] = useState<TaskProject[]>([]);
   const [employeeId, setEmployeeId] = useState('');
   const [description, setDescription] = useState('');
   const [project, setProject] = useState('');
@@ -20,11 +24,12 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
   const [employeesLoading, setEmployeesLoading] = useState(true);
   const [formError, setFormError] = useState('');
   const [message, setMessage] = useState('');
+  const [exporting, setExporting] = useState(false);
   const { tasks: allTasks, loading, error, refresh } = useAssignedTasks();
   // Progress shows tasks the manager assigned; Employee Task shows tasks employees wrote themselves (My Task).
   const tasks = allTasks.filter(t => !t.self_created);
   const employeeTasks = allTasks.filter(t => t.self_created);
-  const projects = Array.from(new Set(allTasks.map(t => t.project_name).filter((name): name is string => !!name))).sort((a, b) => a.localeCompare(b));
+  const projects = Array.from(new Set([...savedProjects.map(p => p.name), ...allTasks.map(t => t.project_name).filter((name): name is string => !!name)])).sort((a, b) => a.localeCompare(b));
   const projectName = project === '__new__' ? newProject.trim() : project;
   const visibleTasks = (tab === 'EMPLOYEE' ? employeeTasks : tasks)
     .filter(t => !projectFilter || t.project_name === projectFilter)
@@ -33,6 +38,7 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
       : b.created.localeCompare(a.created));
   useEffect(() => {
     let active = true;
+    assignedTaskService.listProjects().then(rows => { if (active) setSavedProjects(rows); }).catch(e => active && setFormError(e.message));
     employeeService.getEmployees().then(rows => {
       // Managers can assign to any active employee in the organization, not only direct reports.
       if (active) setEmployees(rows.filter(e => e.role === 'EMPLOYEE' && e.status !== 'INACTIVE'));
@@ -51,8 +57,17 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
     finally { setSaving(false); }
   };
   const completed = tasks.filter(t => t.status === 'END').length;
+  const exportTasks = async () => {
+    setExporting(true); setFormError('');
+    try { await downloadWorkbook([taskSheet('Tasks', tab === 'ASSIGN' ? tasks : visibleTasks)], `voxel1-tasks-${indiaDate()}.xlsx`); }
+    catch (e) { setFormError(e instanceof Error ? e.message : 'Could not download tasks.'); }
+    finally { setExporting(false); }
+  };
   return <div className="max-w-7xl space-y-6 pb-20">
     <div><h1 className="text-xl font-semibold text-slate-900">Team Tasks</h1><p className="mt-1 text-sm text-slate-500">Assign work and follow your team's progress.</p></div>
+    <section className="rounded-xl border border-slate-200 bg-white p-4"><MonthlyReportDownload /></section>
+    <button type="button" onClick={() => void exportTasks()} disabled={loading || !!error || exporting || !(tab === 'ASSIGN' ? tasks : visibleTasks).length} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"><Download size={17} />{exporting ? 'Preparing Excel…' : 'Download task Excel'}</button>
+    {tab !== 'ASSIGN' && formError && <p role="alert" className="text-sm text-red-700">{formError}</p>}
     <div role="tablist" aria-label="Team tasks" className="inline-flex rounded-xl bg-slate-100 p-1">
       {(['ASSIGN','PROGRESS','EMPLOYEE'] as const).map(value => <button key={value} role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`rounded-lg px-5 py-3 text-sm font-semibold ${tab === value ? 'bg-white text-primary shadow-sm' : 'text-slate-500'}`}>{value === 'ASSIGN' ? 'Assign Task' : value === 'PROGRESS' ? 'Progress' : 'Employee Task'}</button>)}
     </div>
@@ -68,7 +83,7 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
           <thead className="bg-slate-50 text-slate-600"><tr>{['Project UID', 'Project Selection', 'Task Description', 'Due Date', 'Person', 'Status'].map(label => <th key={label} scope="col" className="border border-slate-200 p-3 font-semibold">{label}</th>)}</tr></thead>
           <tbody>
             <tr className="align-top">
-              <td className="border border-slate-200 p-3 min-w-24"><span className="block text-sm text-slate-500" title="A permanent project number is assigned when saved">{allTasks.find(t => t.project_name === project)?.project_number ?? 'On save'}</span></td>
+              <td className="border border-slate-200 p-3 min-w-24"><span className="block text-sm text-slate-500" title="A permanent project number is assigned when saved">{savedProjects.find(p => p.name === project)?.project_number ?? allTasks.find(t => t.project_name === project)?.project_number ?? 'On save'}</span></td>
               <td className="border border-slate-200 p-3 min-w-48"><select aria-label="Project Selection" required value={project} disabled={saving || loading} onChange={e => setProject(e.target.value)} className="min-h-12 w-full rounded-lg border border-slate-200 bg-white p-2"><option value="">Choose a project</option>{projects.map(name => <option key={name} value={name}>{name}</option>)}<option value="__new__">+ Add new project</option></select>
                 {project === '__new__' && <input aria-label="New project name" required maxLength={200} value={newProject} disabled={saving} onChange={e => setNewProject(e.target.value)} placeholder="New project name" className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 p-2" />}</td>
               <td className="border border-slate-200 p-3 min-w-64"><textarea aria-label="Task Description" required maxLength={4000} rows={3} value={description} onChange={e => setDescription(e.target.value)} disabled={saving} placeholder="Describe the task" className="w-full rounded-lg border border-slate-200 p-2" /></td>

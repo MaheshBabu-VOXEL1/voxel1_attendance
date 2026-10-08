@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { SubscriptionBanner } from '../components/subscription';
 import { initialsAvatar } from '../utils/initialsAvatar';
+import { MonthEndReminder } from '../components/reports/MonthEndReminder';
 
 
 const SIDEBAR_COLLAPSED_KEY = 'voxel1_sidebar_collapsed';
@@ -152,6 +153,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPath, onNaviga
         {/* Content */}
         <div id="main-content" className="flex-1 p-6 md:p-12 w-full pb-28 md:pb-12 overflow-x-hidden">
           <div className="max-w-4xl mx-auto w-full">
+            {(user.role === 'MANAGER' || user.role === 'ADMIN') && <MonthEndReminder userId={user.id} />}
             {children}
           </div>
 

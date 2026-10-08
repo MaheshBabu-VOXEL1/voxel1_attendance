@@ -84,7 +84,7 @@ export const AttendanceSheet: React.FC<Props> = ({ employees, logs, workingDays,
             <span><span className="text-slate-400 font-bold">–</span> Holiday / weekend / not yet</span>
           </p>
           <p className="text-[11px] text-amber-700 mt-1.5">
-            This sheet shows the last {days} days. Attendance records are kept indefinitely.
+            This sheet shows the last {days} days. Attendance records are kept indefinitely; download the full monthly workbook from Team Tasks.
           </p>
         </div>
         <button

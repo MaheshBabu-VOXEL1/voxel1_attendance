@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 
 export type TaskStatus = 'NOT_STARTED' | 'START' | 'PROGRESS' | 'END';
+export interface TaskProject { id: string; name: string; project_number: number }
 export interface AssignedTask {
   id: string;
   employee_id: string;
@@ -23,12 +24,21 @@ export const statusLabel: Record<TaskStatus, string> = {
   NOT_STARTED: 'Not started', START: 'Started', PROGRESS: 'In progress', END: 'Completed',
 };
 export const assignedTaskService = {
-  async list(employeeId?: string): Promise<AssignedTask[]> {
-    let query = supabase.from('assigned_tasks').select('*').order('created', { ascending: false });
-    if (employeeId) query = query.eq('employee_id', employeeId);
-    const { data, error } = await query;
+  async listProjects(): Promise<TaskProject[]> {
+    const { data, error } = await supabase.from('task_projects').select('id,name,project_number').order('name');
     if (error) throw new Error(error.message);
     return data || [];
+  },
+  async list(employeeId?: string): Promise<AssignedTask[]> {
+    const rows: AssignedTask[] = [];
+    for (let offset = 0; ; offset += 500) {
+      let query = supabase.from('assigned_tasks').select('*').order('created', { ascending: false }).order('id').range(offset, offset + 499);
+      if (employeeId) query = query.eq('employee_id', employeeId);
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+      rows.push(...(data || []));
+      if (!data || data.length < 500) return rows;
+    }
   },
   async assign(employeeId: string, description: string, projectName: string, dueDate: string, status: TaskStatus = 'NOT_STARTED'): Promise<AssignedTask> {
     if (!projectName.trim()) throw new Error('Choose or add a project.');
