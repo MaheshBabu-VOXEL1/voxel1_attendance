@@ -18,6 +18,7 @@ export const changelog: ChangelogRelease[] = [
     date: '2026-10-08',
     title: 'Require a note for leave requests',
     entries: [
+      { type: 'feature', description: 'Managers can assign tasks in a project table with a project dropdown, stable project UID, description, due date, person and initial status. Employees can see the project UID and due date.' },
       { type: 'fix', description: 'Attendance sheets and Excel exports show scheduled days off and holidays as off even when an approved leave range spans them. Actual check-ins on days off still count as present. Leave balances continue to use the saved working-day total.' },
       { type: 'fix', description: 'The employee leave form requires a note for the manager. The employee service also rejects empty or whitespace-only notes before saving a request and trims valid notes.' },
     ],

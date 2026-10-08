@@ -1,4 +1,3 @@
-import React from 'react';
 import { taskStatusStyles } from '../../utils/taskStatusStyles';
 import { useAssignedTasks } from '../../hooks/useAssignedTasks';
 import { statusLabel } from '../../services/assignedTask.service';

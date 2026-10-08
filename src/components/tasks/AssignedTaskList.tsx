@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { taskStatusStyles } from '../../utils/taskStatusStyles';
 import { AssignedTask, assignedTaskService, statusLabel, TaskStatus } from '../../services/assignedTask.service';
 
@@ -23,6 +23,8 @@ export function AssignedTaskList({ tasks, editable = false, onUpdated, emptyText
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${taskStatusStyles[task.status].badge}`}>{statusLabel[task.status]}</span>
       </div>
       <p className="text-xs font-semibold text-primary">Project: {task.project_name || 'No project'}</p>
+      {task.project_id && <p className="text-xs text-slate-500 break-all">Project UID: {task.project_id}</p>}
+      {task.due_date && <p className="text-xs font-medium text-slate-600">Due: {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-GB')}</p>}
       <p className="whitespace-pre-wrap break-words text-sm text-slate-800">{task.description}</p>
       <p className="text-xs text-slate-500">{task.self_created ? 'Sent' : 'Assigned'} {new Date(task.created).toLocaleString()}</p>
       {editable && <fieldset disabled={saving !== null} className="flex flex-wrap gap-3">
