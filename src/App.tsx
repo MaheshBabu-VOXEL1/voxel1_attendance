@@ -34,6 +34,7 @@ if (isRemovedPath(window.location.pathname)) {
 // (one-shot reload + SW/cache wipe) so users don't get stuck on a blank
 // page when their cached service worker still references deleted assets.
 const EmployeeDay = lazyWithReload(() => import('./pages/EmployeeDay'));
+const ManagerApp = lazyWithReload(() => import('./pages/ManagerApp'));
 const Dashboard = lazyWithReload(() => import('./pages/Dashboard'));
 const EmployeeDirectory = lazyWithReload(() => import('./pages/EmployeeDirectory'));
 const Attendance = lazyWithReload(() => import('./pages/Attendance'));
@@ -315,6 +316,8 @@ const AppContent: React.FC = () => {
   // Priority 3: Authenticated App
   const renderContent = () => {
     if (user.role === 'EMPLOYEE' && currentPath !== 'attendance') return <EmployeeDay user={user} onNavigate={handleNavigate} />;
+    // Managers use the Tasks / Leaves / Calendar app only.
+    if (user.role === 'MANAGER') return <ManagerApp user={user} />;
     switch (currentPath) {
       case 'dashboard': return user.role === 'EMPLOYEE'
         ? <AttendanceLeaves user={user} tab="ATTENDANCE" onNavigate={handleNavigate} />
@@ -366,7 +369,7 @@ const AppContent: React.FC = () => {
     <PushPermissionPrompt userId={user.id} organizationId={user.organizationId as string | undefined} />
   );
 
-  if (currentPath === 'attendance' || user.role === 'EMPLOYEE') {
+  if (currentPath === 'attendance' || user.role === 'EMPLOYEE' || user.role === 'MANAGER') {
     return (
       <>
         <Suspense fallback={suspenseFallback}>{renderContent()}</Suspense>

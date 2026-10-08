@@ -16,6 +16,16 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-10-08',
+    title: 'New manager app: Tasks, Leaves, Calendar',
+    entries: [
+      { type: 'feature', description: 'Managers get a new mobile-first app with three tabs. Tasks: quick add with project, person and due date; group by date, person or project; search; change status, person, due date or project from each row; edit or delete a task; swipe right for done or left to change the date.' },
+      { type: 'feature', description: 'Leaves: requests waiting for the manager with clash warnings (others off, tasks due while away, low balance), balance before and after, and one-tap approve or reject; who is off today; recent decisions.' },
+      { type: 'feature', description: 'Calendar: month view of approved leave, events and holidays, with a list of the next two weeks. Managers can add events and company holidays.' },
+      { type: 'feature', description: 'New task status "Stuck". Employees can mark a task Stuck from their home screen and managers see it in red.' },
+    ],
+  },
+  {
+    date: '2026-10-08',
     title: 'Employee name in the top bar',
     entries: [
       { type: 'improvement', description: 'The employee home screen shows the signed-in employee\'s name in the top-right corner instead of the date, which is already shown in the page heading.' },

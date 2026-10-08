@@ -1,11 +1,13 @@
 import { supabase } from './supabase';
 
-export type TaskStatus = 'NOT_STARTED' | 'START' | 'PROGRESS' | 'END';
+export type TaskStatus = 'NOT_STARTED' | 'START' | 'PROGRESS' | 'STUCK' | 'END';
 export interface AssignedTask {
   id: string;
   /** null while the task is unassigned (saved by a manager without a person yet). */
   employee_id: string | null;
   employee_name: string | null;
+  /** The manager who created the task (for self_created tasks: the employee's line manager). */
+  assigned_by?: string;
   manager_name: string;
   description: string;
   project_id?: string | null;
@@ -21,7 +23,7 @@ export interface AssignedTask {
   self_created: boolean;
 }
 export const statusLabel: Record<TaskStatus, string> = {
-  NOT_STARTED: 'Not started', START: 'Started', PROGRESS: 'In progress', END: 'Completed',
+  NOT_STARTED: 'Not started', START: 'Started', PROGRESS: 'In progress', STUCK: 'Stuck', END: 'Completed',
 };
 export const assignedTaskService = {
   async list(employeeId?: string): Promise<AssignedTask[]> {
@@ -52,6 +54,16 @@ export const assignedTaskService = {
     const { data, error } = await supabase.rpc('assign_unassigned_task', { p_task_id: taskId, p_employee_id: employeeId, p_due_date: dueDate || null });
     if (error) throw new Error(error.message);
     return data;
+  },
+  /** Manager edit of a task they created; every field is written (pass the current values for unchanged ones). employeeId null = back to unassigned. */
+  async managerUpdate(taskId: string, f: { description: string; projectName: string; employeeId: string | null; dueDate: string | null; status: TaskStatus }): Promise<AssignedTask> {
+    const { data, error } = await supabase.rpc('manager_update_task', { p_task_id: taskId, p_description: f.description.trim(), p_project_name: f.projectName.trim(), p_employee_id: f.employeeId, p_due_date: f.dueDate || null, p_status: f.status });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+  async managerDelete(taskId: string): Promise<void> {
+    const { error } = await supabase.rpc('manager_delete_task', { p_task_id: taskId });
+    if (error) throw new Error(error.message);
   },
   async createOwn(description: string, status: Exclude<TaskStatus, 'NOT_STARTED'>): Promise<AssignedTask> {
     const { data, error } = await supabase.rpc('create_own_task', { p_description: description.trim(), p_status: status });
