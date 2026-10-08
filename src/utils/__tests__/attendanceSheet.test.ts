@@ -27,6 +27,19 @@ const sheet = (logs: Attendance[], extra: { holidays?: Holiday[]; leaves?: Leave
   })[0];
 
 describe('attendance sheet', () => {
+  it('excludes Sundays and holidays from leave ranges and the Excel export', () => {
+    const row = sheet([log('2026-09-20', { status: 'LEAVE' })], {
+      holidays: [{ id: 'h', date: '2026-09-21', name: 'Holiday' } as Holiday],
+      leaves: [{ employeeId: 'e1', startDate: '2026-09-20', endDate: '2026-09-22', status: 'APPROVED' } as LeaveRequest],
+    });
+    expect(row.cells.slice(0, 3).map(c => c.mark)).toEqual(['OFF', 'OFF', 'LEAVE']);
+    expect(attendanceSheetCsv([row], dates)).toContain('Asha,E-1,-,-,L,');
+  });
+
+  it('still counts actual attendance on a Sunday as present', () => {
+    expect(sheet([log('2026-09-20')]).cells[0].mark).toBe('PRESENT');
+  });
+
   it('ticks days with a check-in, checked out or not, and crosses past working days without one', () => {
     const row = sheet([log('2026-09-21', { checkOut: '18:10' }), log('2026-09-22')]);
     const marks = row.cells.map(c => c.mark);

@@ -70,16 +70,16 @@ export function buildAttendanceSheet(args: {
     const cells = dates.map((date): SheetCell => {
       const log = logByKey.get(`${employee.id}|${date}`);
 
-      if (log && log.status === 'LEAVE') return { mark: 'LEAVE', detail: 'On leave' };
-      if (log && log.status !== 'ABSENT' && log.checkIn && log.checkIn !== '-') {
+      if (log && log.status !== 'ABSENT' && log.status !== 'LEAVE' && log.checkIn && log.checkIn !== '-') {
         presentCount++;
         const late = log.status === 'LATE' ? ' (late)' : '';
         return { mark: 'PRESENT', detail: `In ${log.checkIn}${late}${log.checkOut ? ` · Out ${log.checkOut}` : ' · still checked in'}` };
       }
-      if (onLeave(employee.id, date)) return { mark: 'LEAVE', detail: 'Approved leave' };
       if (started && date < started) return { mark: 'OFF', detail: 'Before joining' };
       if (holidayByDate.has(date)) return { mark: 'OFF', detail: `Holiday: ${holidayByDate.get(date)}` };
       if (workingDays.length > 0 && !workingDays.includes(dayName(date))) return { mark: 'OFF', detail: 'Not a working day' };
+      if (log && log.status === 'LEAVE') return { mark: 'LEAVE', detail: 'On leave' };
+      if (onLeave(employee.id, date)) return { mark: 'LEAVE', detail: 'Approved leave' };
       if (log && log.status === 'ABSENT') {
         absentCount++;
         return { mark: 'ABSENT', detail: 'Marked absent' };
