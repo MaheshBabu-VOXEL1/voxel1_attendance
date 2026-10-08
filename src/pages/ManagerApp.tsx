@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { User, Employee, LeaveRequest, CustomLeaveType, Holiday, LeaveBalance, Attendance } from '../types';
 import { employeeService } from '../services/employee.service';
 import { hrService } from '../services/hrService';
-import { assignedTaskService, AssignedTask, TaskStatus } from '../services/assignedTask.service';
+import { assignedTaskService, AssignedTask, TaskStatus, TaskProject } from '../services/assignedTask.service';
 import { calendarService, CalendarEvent } from '../services/calendar.service';
 import { useAssignedTasks } from '../hooks/useAssignedTasks';
 import { useTheme } from '../context/ThemeContext';
@@ -66,7 +66,7 @@ const NAV: [Route, string, React.ReactNode][] = [
 ];
 
 interface MenuItem { v: string; label: string; sub?: string; lead?: React.ReactNode; on?: boolean; muted?: boolean; sep?: boolean }
-interface Pop { anchor: HTMLElement; kind: 'menu' | 'due'; head?: React.ReactNode; items?: MenuItem[]; cur?: string | null; pick: (v: string) => void }
+interface Pop { anchor: HTMLElement; kind: 'menu' | 'due' | 'newproj'; head?: React.ReactNode; items?: MenuItem[]; cur?: string | null; pick: (v: string) => void }
 
 export default function ManagerApp({ user, onNavigate }: { user: User; onNavigate?: (path: string) => void }) {
   const { darkMode, setDarkModePreference } = useTheme();
@@ -173,7 +173,9 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [sheet, setSheet] = useState<null | { kind: 'task'; id: string } | { kind: 'event' } | { kind: 'account' } | { kind: 'person'; id: string }>(null);
   // Per-screen state lives here (not inside the screen functions) so it survives re-renders.
   const [cpP, setCpP] = useState('');
-  const [newProj, setNewProj] = useState(false);
+  const [savedProjects, setSavedProjects] = useState<TaskProject[]>([]);
+  const [newProjName, setNewProjName] = useState('');
+  const [newProjBusy, setNewProjBusy] = useState(false);
   const [cpWho, setCpWho] = useState('');
   const [cpDue, setCpDue] = useState('');
   const [text, setText] = useState('');
@@ -226,8 +228,24 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
 
   // ---------- tasks ----------
   const tasks = allTasks;
-  const projects = useMemo(() => Array.from(new Set(tasks.map(t => t.project_name).filter((n): n is string => !!n))).sort((a, b) => a.localeCompare(b)), [tasks]);
-  useEffect(() => { if (!cpP && !newProj) { if (projects.length) setCpP(projects[0]); else setNewProj(true); } }, [projects]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Every project in the organization (saved ones, even without tasks) plus any name seen on a task.
+  const projects = useMemo(() => Array.from(new Set([...savedProjects.map(p => p.name), ...tasks.map(t => t.project_name).filter((n): n is string => !!n)]))
+    .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' })), [savedProjects, tasks]);
+  const loadProjects = useCallback(async () => { try { setSavedProjects(await assignedTaskService.listProjects()); } catch { /* list stays task-derived */ } }, []);
+  useEffect(() => { void loadProjects(); }, [loadProjects]);
+  useEffect(() => { if (!cpP && projects.length) setCpP(projects[0]); }, [projects]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** "+ New project": a small box to name it; the project is saved at once and picked. */
+  const newProjectBox = (anchor: HTMLElement, pick: (name: string) => void) => { setNewProjName(''); openPop({ anchor, kind: 'newproj', pick }); };
+  const createProject = async (pick: (name: string) => void) => {
+    const name = newProjName.trim();
+    if (!name || newProjBusy) return;
+    setNewProjBusy(true);
+    try {
+      const p = await assignedTaskService.createProject(name);
+      await loadProjects(); setPop(null); pick(p.name);
+      say(`Project ${p.name} ready · ID ${p.project_number}`);
+    } catch (e) { fail(e); } finally { setNewProjBusy(false); }
+  };
   const canEdit = (t: AssignedTask) => !t.self_created && t.assigned_by === user.id;
   const task = (id: string) => tasks.find(t => t.id === id);
 
@@ -262,7 +280,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     anchor, kind: 'menu', head: 'Project', pick,
     items: [...(all ? [{ v: 'all', label: 'All projects', on: cur === 'all' }, { v: '', label: '', sep: true }] : []),
       ...projects.map(p => ({ v: p, label: p, sub: `${tasks.filter(t => t.project_name === p && t.status !== 'END').length} open`, on: cur === p })),
-      ...(all ? [] : [{ v: '', label: '', sep: true }, { v: '__new__', label: '+ New project', muted: true }])],
+      ...(all ? [] : [...(projects.length ? [{ v: '', label: '', sep: true }] : []), { v: '__new__', label: '+ New project', sub: projects.length ? '' : 'No projects yet', lead: <span className="pav">{I.plus}</span> }])],
   });
   const menuStatus = (anchor: HTMLElement, cur: TaskStatus, pick: (v: string) => void) => openPop({
     anchor, kind: 'menu', head: 'Status', pick, items: ST_ORDER.map(k => ({ v: k, label: ST[k][0], lead: SIC[k], sub: ST[k][1], on: cur === k })),
@@ -300,7 +318,13 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
             onClick={() => { const p = pop.pick; setPop(null); p(it.v); }}>
             {it.lead}<span className="pl">{it.label}</span><small>{it.sub || ''}</small>{it.on && <span className="ck">{I.check}</span>}
           </button>)}
-      </> : DueSeg(pop.cur ?? null, v => { const p = pop.pick; setPop(null); p(v); }, !!pop.cur)}
+      </> : pop.kind === 'newproj' ? <form className="np" onSubmit={e => { e.preventDefault(); void createProject(pop.pick); }}>
+        <div className="phd">New project</div>
+        <label className="vh" htmlFor="npName">Project name</label>
+        <input id="npName" className="inp" placeholder="Project name" maxLength={200} autoFocus autoComplete="off" value={newProjName} onChange={e => setNewProjName(e.target.value)} />
+        <div className="np-a"><button type="button" className="btn" onClick={() => setPop(null)}>Cancel</button>
+          <button type="submit" className="btn pri" disabled={!newProjName.trim() || newProjBusy}>{newProjBusy ? 'Creating…' : 'Create'}</button></div>
+      </form> : DueSeg(pop.cur ?? null, v => { const p = pop.pick; setPop(null); p(v); }, !!pop.cur)}
     </div>}
 
     <div className={`scrim${sheet ? ' show' : ''}`} onClick={() => setSheet(null)} />
@@ -338,14 +362,14 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       const items = text.split(';').map(x => x.trim()).filter(Boolean);
       const project = cpP.trim();
       if (!items.length || adding) return;
-      if (!project) { say('Choose or type a project first'); return; }
+      if (!project) { say('Choose a project first, or create one with + New project'); return; }
       setAdding(true);
       try {
         const created: AssignedTask[] = [];
         for (const d of items) created.push(cpWho ? await assignedTaskService.assign(cpWho, d, project, cpDue, 'NOT_STARTED') : await assignedTaskService.createUnassigned(d, project, cpDue));
         const msg = `${items.length > 1 ? `${items.length} tasks added` : 'Added'} · ${project}${cpWho ? ` · ${empName(cpWho)}` : ''}${cpDue ? ` · ${dueWord(cpDue)}` : ''}`;
-        setText(''); setCpWho(''); setCpDue(''); setNewProj(false);
-        await refresh();
+        setText(''); setCpWho(''); setCpDue('');
+        await Promise.all([refresh(), loadProjects()]);
         say(msg, () => { void Promise.all(created.map(c => assignedTaskService.managerDelete(c.id))).then(refresh).catch(fail); });
       } catch (e) { fail(e); } finally { setAdding(false); }
     };
@@ -373,12 +397,9 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       {tasksError && <p className="alert" role="alert">{tasksError}</p>}
       <div className="card comp">
         <div className="c1">
-          {newProj
-            ? <input className="pjin" aria-label="New project name" placeholder="Project name" value={cpP} maxLength={200} autoFocus={projects.length > 0}
-                onChange={e => setCpP(e.target.value)} onBlur={() => { if (!cpP.trim() && projects.length) { setCpP(projects[0]); setNewProj(false); } }} />
-            : <button type="button" className="pj" aria-haspopup="listbox" aria-label={`Project: ${cpP}`}
-                onClick={e => menuProject(e.currentTarget, cpP, v => { if (v === '__new__') { setCpP(''); setNewProj(true); } else setCpP(v); })}>
-                <span>{cpP || 'Project'}</span>{I.down}</button>}
+          <button type="button" className="pj" aria-haspopup="listbox" aria-label={`Project: ${cpP || 'choose'}`}
+            onClick={e => { const a = e.currentTarget; menuProject(a, cpP, v => { if (v === '__new__') newProjectBox(a, n => setCpP(n)); else setCpP(v); }); }}>
+            <span>{cpP || 'Project'}</span>{I.down}</button>
           <label className="vh" htmlFor="addT">New task</label>
           <input id="addT" placeholder="Add a task…" enterKeyHint="done" autoComplete="off" value={text} maxLength={4000}
             onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void add(); } }} />
@@ -481,7 +502,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       <div className="fields">
         <div className="f"><span>Status</span><button className="fv" disabled={!edit} aria-haspopup="listbox" onClick={e => menuStatus(e.currentTarget, t.status, v => void update(t, { s: v as TaskStatus }))}>{SIC[t.status]}<span>{ST[t.status][0]}</span>{I.down}</button></div>
         <div className="f"><span>Assigned to</span><button className="fv" disabled={!edit} aria-haspopup="listbox" onClick={e => menuWho(e.currentTarget, t.employee_id, v => void update(t, { who: v || null }))}>{I.user}<span>{t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Not assigned'}</span>{I.down}</button></div>
-        <div className="f"><span>Project</span><button className="fv" disabled={!edit} aria-haspopup="listbox" onClick={e => menuProject(e.currentTarget, t.project_name || '', v => { if (v !== '__new__') void update(t, { p: v }); else { const n = window.prompt('New project name'); if (n?.trim()) void update(t, { p: n.trim() }); } })}><span>{t.project_name || 'No project'}</span>{I.down}</button></div>
+        <div className="f"><span>Project</span><button className="fv" disabled={!edit} aria-haspopup="listbox" onClick={e => { const a = e.currentTarget; menuProject(a, t.project_name || '', v => { if (v !== '__new__') void update(t, { p: v }); else newProjectBox(a, n => void update(t, { p: n })); }); }}><span>{t.project_name || 'No project'}</span>{I.down}</button></div>
         <div className="f col"><span>Due date{t.due_date ? ` · ${dshort(t.due_date)}` : ''}</span>
           {edit ? DueSeg(t.due_date ?? null, v => void update(t, { due: v || null }), !!t.due_date) : <span>{t.due_date ? dshort(t.due_date) : 'No due date'}</span>}</div>
       </div>

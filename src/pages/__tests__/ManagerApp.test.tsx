@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import ManagerApp from '../ManagerApp';
 import { assignedTaskService } from '../../services/assignedTask.service';
 import { hrService } from '../../services/hrService';
@@ -36,7 +36,7 @@ vi.mock('../../services/calendar.service', () => ({ calendarService: {
 } }));
 vi.mock('../../services/assignedTask.service', async (orig) => {
   const real = await orig<typeof import('../../services/assignedTask.service')>();
-  return { ...real, assignedTaskService: { assign: vi.fn(async () => ({ id: 'n1' })), createUnassigned: vi.fn(async () => ({ id: 'n2' })), managerUpdate: vi.fn(async () => ({})), managerDelete: vi.fn(async () => {}) } };
+  return { ...real, assignedTaskService: { listProjects: vi.fn(async () => [{ id: 'p2', name: 'KAFD', project_number: 2 }]), createProject: vi.fn(async (n: string) => ({ id: 'p3', name: n, project_number: 3 })), assign: vi.fn(async () => ({ id: 'n1' })), createUnassigned: vi.fn(async () => ({ id: 'n2' })), managerUpdate: vi.fn(async () => ({})), managerDelete: vi.fn(async () => {}) } };
 });
 
 const user = { id: 'mgr', name: 'Test Manager', role: 'MANAGER', email: 'tm@example.com' } as any;
@@ -107,6 +107,23 @@ describe('manager app', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(assignedTaskService.createUnassigned).toHaveBeenCalledWith('Pump room check', 'Vyoma', ''));
     expect(assignedTaskService.assign).not.toHaveBeenCalled();
+  });
+
+  it('picks a saved project from the dropdown and creates a new one with + New project', async () => {
+    render(<ManagerApp user={user} />);
+    await waitFor(() => expect(assignedTaskService.listProjects).toHaveBeenCalled());
+    await act(async () => {});
+    fireEvent.click(screen.getByRole('button', { name: /^Project:/ }));
+    expect(await screen.findByRole('option', { name: /KAFD/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Vyoma/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('option', { name: /New project/ }));
+    fireEvent.change(await screen.findByLabelText('Project name'), { target: { value: 'Hamad Port' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(assignedTaskService.createProject).toHaveBeenCalledWith('Hamad Port'));
+    expect(await screen.findByRole('button', { name: 'Project: Hamad Port' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('New task'), { target: { value: 'Pump room check' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(assignedTaskService.createUnassigned).toHaveBeenCalledWith('Pump room check', 'Hamad Port', ''));
   });
 
   it('changes status to Stuck through the status menu', async () => {

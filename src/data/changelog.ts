@@ -16,6 +16,13 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-10-08',
+    title: 'Project dropdown',
+    entries: [
+      { type: 'improvement', description: 'In the manager app the project is always picked from a dropdown of the company\'s projects, including projects that have no tasks yet. "+ New project" creates and saves a project (with its permanent project ID) and selects it.' },
+    ],
+  },
+  {
+    date: '2026-10-08',
     title: 'Attendance table for managers',
     entries: [
       { type: 'improvement', description: 'Manager app tabs are now Tasks, Leaves and Attendance. Attendance has a Table view (Present, Late, On leave, Not in; each person\'s In, Out and Hours for any day) and a Calendar view (leave, events and holidays). Tap a person to see their last 10 working days with days in, late count and average hours.' },

@@ -284,6 +284,9 @@ table.att{width:100%;border-collapse:collapse;font-size:13.5px}
 .err{min-height:18px;margin-top:8px;font-size:13px;font-weight:600;color:var(--bad)}
 .att tbody tr[data-a]:focus-visible td{background:var(--tint)}
 /* app additions */
+.np{padding:4px 6px 6px;min-width:260px}
+.np .inp{margin-top:2px}
+.np-a{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
 .mycheck{margin-bottom:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 12px 12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .att-l{display:flex;align-items:center;gap:10px;min-width:0}
 .att-l b{display:block;font-size:15.5px;font-weight:700;color:var(--ink)}

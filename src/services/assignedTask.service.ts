@@ -25,7 +25,22 @@ export interface AssignedTask {
 export const statusLabel: Record<TaskStatus, string> = {
   NOT_STARTED: 'Not started', START: 'Started', PROGRESS: 'In progress', STUCK: 'Stuck', END: 'Completed',
 };
+export interface TaskProject { id: string; name: string; project_number: number }
 export const assignedTaskService = {
+  /** The organization's projects, including ones with no tasks yet (task_projects is read through this function only). */
+  async listProjects(): Promise<TaskProject[]> {
+    const { data, error } = await supabase.rpc('list_task_projects');
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+  /** Creates a project, or returns the existing one with the same name. */
+  async createProject(name: string): Promise<TaskProject> {
+    const { data, error } = await supabase.rpc('create_task_project', { p_name: name.trim() });
+    if (error) throw new Error(error.message);
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) throw new Error('Could not create the project.');
+    return row;
+  },
   async list(employeeId?: string): Promise<AssignedTask[]> {
     const rows: AssignedTask[] = [];
     for (let offset = 0; ; offset += 500) {
