@@ -36,7 +36,7 @@ export function reportSheet(name: string, headers: string[], rows: (string | num
 
 export function taskSheet(name: string, tasks: AssignedTask[]) {
   return reportSheet(name, ['Project UID', 'Project Selection', 'Task Description', 'Due Date', 'Person', 'Status', 'Assigned / Sent (IST)', 'Started (IST)', 'Completed (IST)', 'Task ID'],
-    tasks.map(t => [t.project_number, t.project_name, t.description, t.due_date, t.employee_name, statusLabel[t.status], indiaTimestamp(t.created), indiaTimestamp(t.started_at), indiaTimestamp(t.completed_at), t.id]));
+    tasks.map(t => [t.project_number, t.project_name, t.description, t.due_date, t.employee_name || 'Unassigned', statusLabel[t.status], indiaTimestamp(t.created), indiaTimestamp(t.started_at), indiaTimestamp(t.completed_at), t.id]));
 }
 
 export async function downloadWorkbook(sheets: Sheet<Blob>[], name: string) {

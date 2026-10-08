@@ -24,9 +24,14 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
   const [formError, setFormError] = useState('');
   const [message, setMessage] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [later, setLater] = useState<Record<string, { employeeId: string; dueDate: string }>>({});
+  const [assigningId, setAssigningId] = useState<string | null>(null);
   const { tasks: allTasks, loading, error, refresh } = useAssignedTasks();
   // Progress shows tasks the manager assigned; Employee Task shows tasks employees wrote themselves (My Task).
-  const tasks = allTasks.filter(t => !t.self_created);
+  const managerTasks = allTasks.filter(t => !t.self_created);
+  // Unassigned tasks have no person yet; the database shows them only to the manager who added them.
+  const unassigned = managerTasks.filter(t => !t.employee_id);
+  const tasks = managerTasks.filter(t => t.employee_id);
   const employeeTasks = allTasks.filter(t => t.self_created);
   const projects = Array.from(new Set(allTasks.map(t => t.project_name).filter((name): name is string => !!name))).sort((a, b) => a.localeCompare(b));
   const projectName = project === '__new__' ? newProject.trim() : project;
@@ -45,26 +50,44 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
   }, [user.id, user.role]);
   const assign = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (saving || !employeeId || !description.trim() || !projectName || !dueDate) return;
+    if (saving || !description.trim() || !projectName) return;
     setSaving(true); setFormError(''); setMessage('');
     try {
-      const existingProject = projects.find(name => name.toLowerCase() === projectName.toLowerCase());
-      await assignedTaskService.assign(employeeId, description, existingProject || projectName, dueDate, status);
+      const existingProject = projects.find(name => name.toLowerCase() === projectName.toLowerCase()) || projectName;
+      if (!employeeId) {
+        // Saved for later: keep the project selected so the next task of the day is quicker to add.
+        await assignedTaskService.createUnassigned(description, existingProject, dueDate);
+        setDescription(''); setDueDate(''); setProject(existingProject); setNewProject('');
+        setMessage('Task saved as unassigned. Choose a person for it below when you are ready.'); await refresh();
+        return;
+      }
+      await assignedTaskService.assign(employeeId, description, existingProject, dueDate, status);
       setDueDate(''); setStatus('NOT_STARTED'); setDescription(''); setProject(''); setNewProject(''); setProjectFilter(''); setMessage('Task assigned. Your employee can now see it.'); await refresh(); setTab('PROGRESS');
-    } catch (e) { setFormError(e instanceof Error ? e.message : 'Could not assign task.'); }
+    } catch (e) { setFormError(e instanceof Error ? e.message : 'Could not save task.'); }
     finally { setSaving(false); }
+  };
+  const assignLater = async (taskId: string) => {
+    const pick = later[taskId];
+    if (assigningId || !pick?.employeeId) return;
+    setAssigningId(taskId); setFormError(''); setMessage('');
+    try {
+      await assignedTaskService.assignLater(taskId, pick.employeeId, pick.dueDate);
+      setLater(({ [taskId]: _done, ...rest }) => rest);
+      setMessage('Task assigned. Your employee can now see it.'); await refresh();
+    } catch (e) { setFormError(e instanceof Error ? e.message : 'Could not assign task.'); }
+    finally { setAssigningId(null); }
   };
   const completed = tasks.filter(t => t.status === 'END').length;
   const exportTasks = async () => {
     setExporting(true); setFormError('');
-    try { await downloadWorkbook([taskSheet('Tasks', tab === 'ASSIGN' ? tasks : visibleTasks)], `voxel1-tasks-${indiaDate()}.xlsx`); }
+    try { await downloadWorkbook([taskSheet('Tasks', tab === 'ASSIGN' ? managerTasks : visibleTasks)], `voxel1-tasks-${indiaDate()}.xlsx`); }
     catch (e) { setFormError(e instanceof Error ? e.message : 'Could not download tasks.'); }
     finally { setExporting(false); }
   };
   return <div className="max-w-7xl space-y-6 pb-20">
     <div><h1 className="text-xl font-semibold text-slate-900">Team Tasks</h1><p className="mt-1 text-sm text-slate-500">Assign work and follow your team's progress.</p></div>
     <section className="rounded-xl border border-slate-200 bg-white p-4"><MonthlyReportDownload /></section>
-    <button type="button" onClick={() => void exportTasks()} disabled={loading || !!error || exporting || !(tab === 'ASSIGN' ? tasks : visibleTasks).length} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"><Download size={17} />{exporting ? 'Preparing Excel…' : 'Download task Excel'}</button>
+    <button type="button" onClick={() => void exportTasks()} disabled={loading || !!error || exporting || !(tab === 'ASSIGN' ? managerTasks : visibleTasks).length} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"><Download size={17} />{exporting ? 'Preparing Excel…' : 'Download task Excel'}</button>
     {tab !== 'ASSIGN' && formError && <p role="alert" className="text-sm text-red-700">{formError}</p>}
     <div role="tablist" aria-label="Team tasks" className="inline-flex rounded-xl bg-slate-100 p-1">
       {(['ASSIGN','PROGRESS','EMPLOYEE'] as const).map(value => <button key={value} role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`rounded-lg px-5 py-3 text-sm font-semibold ${tab === value ? 'bg-white text-primary shadow-sm' : 'text-slate-500'}`}>{value === 'ASSIGN' ? 'Assign Task' : value === 'PROGRESS' ? 'Progress' : 'Employee Task'}</button>)}
@@ -74,8 +97,8 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
       <div><label htmlFor="filter-project" className="mb-2 block text-sm font-semibold">Filter by project</label><select id="filter-project" value={projectFilter} onChange={e => setProjectFilter(e.target.value)} className="min-h-12 rounded-xl border border-slate-200 bg-white p-3 text-sm"><option value="">All projects</option>{projects.map(name => <option key={name} value={name}>{name}</option>)}</select></div>
       <div><label htmlFor="sort-tasks" className="mb-2 block text-sm font-semibold">Sort tasks</label><select id="sort-tasks" value={sortBy} onChange={e => setSortBy(e.target.value)} className="min-h-12 rounded-xl border border-slate-200 bg-white p-3 text-sm"><option value="newest">Newest first</option><option value="project">Project name (A–Z)</option></select></div>
     </div>}
-    {tab === 'ASSIGN' ? <form onSubmit={assign} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-      <div><h2 className="font-semibold text-slate-900">Assign project tasks</h2><p className="mt-1 text-sm text-slate-500">Choose a project and assign work to your team. Each project keeps the same unique ID.</p></div>
+    {tab === 'ASSIGN' ? <><form onSubmit={assign} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+      <div><h2 className="font-semibold text-slate-900">Assign project tasks</h2><p className="mt-1 text-sm text-slate-500">Choose a project and describe the task. Person and due date are optional: leave Person as Unassigned to save the task now and choose later.</p></div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1050px] border-collapse text-left text-sm">
           <thead className="bg-slate-50 text-slate-600"><tr>{['Project UID', 'Project Selection', 'Task Description', 'Due Date', 'Person', 'Status'].map(label => <th key={label} scope="col" className="border border-slate-200 p-3 font-semibold">{label}</th>)}</tr></thead>
@@ -85,9 +108,9 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
               <td className="border border-slate-200 p-3 min-w-48"><select aria-label="Project Selection" required value={project} disabled={saving || loading} onChange={e => setProject(e.target.value)} className="min-h-12 w-full rounded-lg border border-slate-200 bg-white p-2"><option value="">Choose a project</option>{projects.map(name => <option key={name} value={name}>{name}</option>)}<option value="__new__">+ Add new project</option></select>
                 {project === '__new__' && <input aria-label="New project name" required maxLength={200} value={newProject} disabled={saving} onChange={e => setNewProject(e.target.value)} placeholder="New project name" className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 p-2" />}</td>
               <td className="border border-slate-200 p-3 min-w-64"><textarea aria-label="Task Description" required maxLength={4000} rows={3} value={description} onChange={e => setDescription(e.target.value)} disabled={saving} placeholder="Describe the task" className="w-full rounded-lg border border-slate-200 p-2" /></td>
-              <td className="border border-slate-200 p-3"><input aria-label="Due Date" type="date" required value={dueDate} onChange={e => setDueDate(e.target.value)} disabled={saving} className="min-h-12 rounded-lg border border-slate-200 p-2" /></td>
-              <td className="border border-slate-200 p-3 min-w-48"><select aria-label="Person" required value={employeeId} onChange={e => setEmployeeId(e.target.value)} disabled={employeesLoading || saving} className="min-h-12 w-full rounded-lg border border-slate-200 bg-white p-2"><option value="">{employeesLoading ? 'Loading employees…' : 'Choose a person'}</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></td>
-              <td className="border border-slate-200 p-3 min-w-40"><select aria-label="Status" value={status} onChange={e => setStatus(e.target.value as TaskStatus)} disabled={saving} className="min-h-12 w-full rounded-lg border border-slate-200 bg-white p-2">{(['NOT_STARTED', 'START', 'PROGRESS', 'END'] as const).map(value => <option key={value} value={value}>{statusLabel[value]}</option>)}</select></td>
+              <td className="border border-slate-200 p-3"><input aria-label="Due Date" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} disabled={saving} className="min-h-12 rounded-lg border border-slate-200 p-2" /></td>
+              <td className="border border-slate-200 p-3 min-w-48"><select aria-label="Person" value={employeeId} onChange={e => setEmployeeId(e.target.value)} disabled={employeesLoading || saving} className="min-h-12 w-full rounded-lg border border-slate-200 bg-white p-2"><option value="">{employeesLoading ? 'Loading employees…' : 'Unassigned (choose later)'}</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></td>
+              <td className="border border-slate-200 p-3 min-w-40"><select aria-label="Status" value={employeeId ? status : 'NOT_STARTED'} onChange={e => setStatus(e.target.value as TaskStatus)} disabled={saving || !employeeId} className="min-h-12 w-full rounded-lg border border-slate-200 bg-white p-2">{(['NOT_STARTED', 'START', 'PROGRESS', 'END'] as const).map(value => <option key={value} value={value}>{statusLabel[value]}</option>)}</select></td>
             </tr>
             {tasks.map(task => <tr key={task.id} className="align-top text-slate-700"><td className="border border-slate-200 p-3"><span className="whitespace-nowrap font-medium">{task.project_number ?? '—'}</span></td><td className="border border-slate-200 p-3">{task.project_name || '—'}</td><td className="border border-slate-200 p-3 whitespace-pre-wrap break-words max-w-sm">{task.description}</td><td className="border border-slate-200 p-3 whitespace-nowrap">{task.due_date ? new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-GB') : '—'}</td><td className="border border-slate-200 p-3">{task.employee_name}</td><td className="border border-slate-200 p-3">{statusLabel[task.status]}</td></tr>)}
           </tbody>
@@ -95,8 +118,28 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
       </div>
       {!employeesLoading && !employees.length && <p className="text-sm text-slate-500">No active employees assigned to you yet.</p>}
       {(formError || error) && <p role="alert" className="text-sm text-red-600">{formError || error}</p>}
-      <button type="submit" disabled={saving || loading || !employeeId || !description.trim() || !projectName || !dueDate} className="min-h-12 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Assigning…' : 'Assign Task'}</button>
-    </form> : tab === 'EMPLOYEE' ? <div role="tabpanel" className="space-y-4">
+      <button type="submit" disabled={saving || loading || !description.trim() || !projectName} className="min-h-12 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Saving…' : employeeId ? 'Assign Task' : 'Save as unassigned'}</button>
+    </form>
+    <section aria-labelledby="unassigned-heading" className="space-y-4 rounded-2xl border border-amber-200 bg-white p-5">
+      <div><h2 id="unassigned-heading" className="font-semibold text-slate-900">Unassigned tasks ({unassigned.length})</h2><p className="mt-1 text-sm text-slate-500">Only you can see these. Choose a person (and a due date if you want) to send each task to an employee.</p></div>
+      {!unassigned.length ? <p className="text-sm text-slate-500">No unassigned tasks. Save a task without a person to add it here.</p> : <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+          <thead className="bg-amber-50 text-slate-600"><tr>{['Project UID', 'Project', 'Task Description', 'Due Date', 'Person', ''].map((label, i) => <th key={i} scope="col" className="border border-slate-200 p-3 font-semibold">{label}</th>)}</tr></thead>
+          <tbody>{unassigned.map(task => {
+            const pick = later[task.id] ?? { employeeId: '', dueDate: task.due_date ?? '' };
+            const setPick = (next: Partial<typeof pick>) => setLater(prev => ({ ...prev, [task.id]: { ...pick, ...next } }));
+            return <tr key={task.id} className="align-top text-slate-700">
+              <td className="border border-slate-200 p-3 whitespace-nowrap font-medium">{task.project_number ?? '—'}</td>
+              <td className="border border-slate-200 p-3">{task.project_name || '—'}</td>
+              <td className="border border-slate-200 p-3 whitespace-pre-wrap break-words max-w-sm">{task.description}</td>
+              <td className="border border-slate-200 p-3"><input aria-label={'Due date for ' + task.description} type="date" value={pick.dueDate} onChange={e => setPick({ dueDate: e.target.value })} disabled={assigningId !== null} className="min-h-11 rounded-lg border border-slate-200 p-2" /></td>
+              <td className="border border-slate-200 p-3 min-w-48"><select aria-label={'Person for ' + task.description} value={pick.employeeId} onChange={e => setPick({ employeeId: e.target.value })} disabled={employeesLoading || assigningId !== null} className="min-h-11 w-full rounded-lg border border-slate-200 bg-white p-2"><option value="">Choose a person</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></td>
+              <td className="border border-slate-200 p-3"><button type="button" onClick={() => void assignLater(task.id)} disabled={!pick.employeeId || assigningId !== null} className="min-h-11 whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{assigningId === task.id ? 'Assigning…' : 'Assign'}</button></td>
+            </tr>;
+          })}</tbody>
+        </table>
+      </div>}
+    </section></> : tab === 'EMPLOYEE' ? <div role="tabpanel" className="space-y-4">
       <p className="text-sm text-slate-600">{employeeTasks.filter(t => t.status === 'END').length} completed · {employeeTasks.filter(t => t.status !== 'END').length} open · Written by your employees · Updates automatically</p>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       {loading ? <p role="status">Loading tasks…</p> : <AssignedTaskList tasks={visibleTasks} emptyText={projectFilter ? 'No tasks for this project.' : 'No tasks sent by employees yet.'} />}

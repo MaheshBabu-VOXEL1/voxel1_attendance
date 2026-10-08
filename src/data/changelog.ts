@@ -16,6 +16,13 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-10-08',
+    title: 'Unassigned tasks',
+    entries: [
+      { type: 'feature', description: 'Managers can save tasks with only a project and description during the day. Person and due date are optional; tasks without a person go to an Unassigned list that only their creator sees, where each can be given a person and due date later. Employees see a task only once it is assigned to them.' },
+    ],
+  },
+  {
+    date: '2026-10-08',
     title: 'Monthly Excel reports',
     entries: [
       { type: 'feature', description: 'Managers and Admins can download a monthly Excel workbook with attendance, employee details, assigned tasks and task progress, plus a task Excel from Team Tasks.' },

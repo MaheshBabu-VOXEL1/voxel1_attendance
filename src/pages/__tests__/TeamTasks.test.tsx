@@ -4,7 +4,7 @@ import TeamTasks from '../TeamTasks';
 import { employeeService } from '../../services/employee.service';
 import { assignedTaskService } from '../../services/assignedTask.service';
 vi.mock('../../services/employee.service', () => ({ employeeService: { getEmployees: vi.fn() } }));
-vi.mock('../../services/assignedTask.service', () => ({ assignedTaskService: { list: vi.fn(), assign: vi.fn() }, statusLabel: { NOT_STARTED: 'Not started', START: 'Started', PROGRESS: 'In progress', END: 'Completed' } }));
+vi.mock('../../services/assignedTask.service', () => ({ assignedTaskService: { list: vi.fn(), assign: vi.fn(), createUnassigned: vi.fn(), assignLater: vi.fn() }, statusLabel: { NOT_STARTED: 'Not started', START: 'Started', PROGRESS: 'In progress', END: 'Completed' } }));
 describe('manager task assignments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -43,9 +43,9 @@ describe('manager task assignments', () => {
   });
   it('selects existing projects and sorts and filters progress by project', async () => {
     vi.mocked(assignedTaskService.list).mockResolvedValue([
-      {id:'b', employee_name:'My Employee', description:'Beta task', project_name:'Beta', status:'END', created:'2026-10-02'},
-      {id:'a', employee_name:'My Employee', description:'Alpha task', project_name:'Alpha', project_id:'project-alpha', project_number:1, due_date:'2026-10-15', status:'END', created:'2026-10-01'},
-      {id:'old', employee_name:'My Employee', description:'Legacy task', status:'END', created:'2026-09-01'},
+      {id:'b', employee_id:'mine', employee_name:'My Employee', description:'Beta task', project_name:'Beta', status:'END', created:'2026-10-02'},
+      {id:'a', employee_id:'mine', employee_name:'My Employee', description:'Alpha task', project_name:'Alpha', project_id:'project-alpha', project_number:1, due_date:'2026-10-15', status:'END', created:'2026-10-01'},
+      {id:'old', employee_id:'mine', employee_name:'My Employee', description:'Legacy task', status:'END', created:'2026-09-01'},
     ] as any);
     render(<TeamTasks user={{id:'manager', role:'MANAGER'} as any} />);
     await screen.findByRole('option', {name:'Alpha'});
@@ -76,5 +76,35 @@ describe('manager task assignments', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Assign Task' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Connection lost');
     expect(screen.getByLabelText('Task Description')).toHaveValue('Review drawing');
+  });
+  it('saves a task without a person or due date as unassigned and keeps the project', async () => {
+    vi.mocked(assignedTaskService.createUnassigned).mockResolvedValue({ id: 'draft' } as any);
+    render(<TeamTasks user={{ id: 'manager', role: 'MANAGER' } as any} />);
+    await screen.findByRole('option', { name: 'My Employee' });
+    fireEvent.change(screen.getByLabelText('Project Selection'), { target: { value: '__new__' } });
+    fireEvent.change(screen.getByLabelText('New project name'), { target: { value: 'Tower A' } });
+    fireEvent.change(screen.getByLabelText('Task Description'), { target: { value: 'Check drawings' } });
+    expect(screen.getByLabelText('Status')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save as unassigned' }));
+    await waitFor(() => expect(assignedTaskService.createUnassigned).toHaveBeenCalledWith('Check drawings', 'Tower A', ''));
+    expect(assignedTaskService.assign).not.toHaveBeenCalled();
+    expect(await screen.findByText(/saved as unassigned/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Task Description')).toHaveValue('');
+    expect(screen.getByRole('tab', { name: 'Assign Task' })).toHaveAttribute('aria-selected', 'true');
+  });
+  it('assigns an unassigned task later, with an optional due date, and keeps it out of Progress until then', async () => {
+    vi.mocked(assignedTaskService.list).mockResolvedValue([
+      { id: 'draft', employee_id: null, employee_name: null, description: 'Draft task', project_name: 'Alpha', project_number: 1, status: 'NOT_STARTED', created: '2026-10-08' },
+    ] as any);
+    vi.mocked(assignedTaskService.assignLater).mockResolvedValue({ id: 'draft' } as any);
+    render(<TeamTasks user={{ id: 'manager', role: 'MANAGER' } as any} />);
+    expect(await screen.findByRole('heading', { name: 'Unassigned tasks (1)' })).toBeInTheDocument();
+    const assignBtn = screen.getByRole('button', { name: 'Assign' });
+    expect(assignBtn).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Person for Draft task'), { target: { value: 'other' } });
+    fireEvent.click(assignBtn);
+    await waitFor(() => expect(assignedTaskService.assignLater).toHaveBeenCalledWith('draft', 'other', ''));
+    fireEvent.click(screen.getByRole('tab', { name: 'Progress' }));
+    expect(screen.queryByText('Draft task')).not.toBeInTheDocument();
   });
 });
