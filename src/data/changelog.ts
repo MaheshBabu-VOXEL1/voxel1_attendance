@@ -16,6 +16,13 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-10-08',
+    title: 'Readable project IDs',
+    entries: [
+      { type: 'improvement', description: 'Project UIDs now display permanent numbers such as 1, 2 and 3 instead of long UUIDs. Tasks in the same project share the same number.' },
+    ],
+  },
+  {
+    date: '2026-10-08',
     title: 'Require a note for leave requests',
     entries: [
       { type: 'feature', description: 'Managers can assign tasks in a project table with a project dropdown, stable project UID, description, due date, person and initial status. Employees can see the project UID and due date.' },

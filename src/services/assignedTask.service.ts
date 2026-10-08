@@ -8,6 +8,7 @@ export interface AssignedTask {
   manager_name: string;
   description: string;
   project_id?: string | null;
+  project_number?: number | null;
   due_date?: string | null;
   project_name?: string | null;
   status: TaskStatus;

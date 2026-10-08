@@ -44,13 +44,14 @@ describe('manager task assignments', () => {
   it('selects existing projects and sorts and filters progress by project', async () => {
     vi.mocked(assignedTaskService.list).mockResolvedValue([
       {id:'b', employee_name:'My Employee', description:'Beta task', project_name:'Beta', status:'END', created:'2026-10-02'},
-      {id:'a', employee_name:'My Employee', description:'Alpha task', project_name:'Alpha', project_id:'project-alpha', due_date:'2026-10-15', status:'END', created:'2026-10-01'},
+      {id:'a', employee_name:'My Employee', description:'Alpha task', project_name:'Alpha', project_id:'project-alpha', project_number:1, due_date:'2026-10-15', status:'END', created:'2026-10-01'},
       {id:'old', employee_name:'My Employee', description:'Legacy task', status:'END', created:'2026-09-01'},
     ] as any);
     render(<TeamTasks user={{id:'manager', role:'MANAGER'} as any} />);
     await screen.findByRole('option', {name:'Alpha'});
     fireEvent.change(screen.getByLabelText('Project Selection'), {target:{value:'Alpha'}});
-    expect(screen.getAllByText('project-alpha')).toHaveLength(2);
+    expect(screen.getAllByText('1', {exact:true})).toHaveLength(2);
+    expect(screen.queryByText('project-alpha')).not.toBeInTheDocument();
     expect(screen.getByText('15/10/2026')).toBeInTheDocument();
     expect(screen.queryByLabelText('New project name')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', {name:'Progress'}));
