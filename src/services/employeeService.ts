@@ -9,11 +9,15 @@ export const employeeService = {
   },
 
   async applyForLeave(data: Partial<LeaveRequest>, user: any) {
+    const reason = data.reason?.trim();
+    if (!reason) throw new Error('Please enter a note for your manager.');
+
     const employees = await hrService.getEmployees();
     const me = employees.find(e => e.id === user.id);
     
     return hrService.saveLeaveRequest({
       ...data,
+      reason,
       employeeId: user.id,
       employeeName: user.name,
       lineManagerId: me?.lineManagerId,

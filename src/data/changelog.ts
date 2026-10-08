@@ -15,6 +15,13 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-10-08',
+    title: 'Require a note for leave requests',
+    entries: [
+      { type: 'fix', description: 'The employee leave form requires a note for the manager. The employee service also rejects empty or whitespace-only notes before saving a request and trims valid notes.' },
+    ],
+  },
+  {
     date: '2026-09-30',
     title: 'Keep attendance history indefinitely',
     entries: [
