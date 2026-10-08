@@ -13,7 +13,7 @@ import './ManagerApp.css';
 
 /* Manager app: Tasks / Leaves / Calendar, built from the voxel1-manager.html design on live data. */
 
-type Route = 'tasks' | 'leaves' | 'calendar';
+type Route = 'tasks' | 'attendance' | 'leaves' | 'calendar';
 type Group = 'date' | 'person' | 'project';
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
 const MONL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -61,6 +61,7 @@ const SIC: Record<TaskStatus, React.ReactNode> = {
 };
 const NAV: [Route, string, React.ReactNode][] = [
   ['tasks', 'Tasks', <Svg w={22} sw={1.9}><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3" /></Svg>],
+  ['attendance', 'Attendance', <Svg w={22} sw={1.9}><circle cx="9" cy="8" r="4" /><path d="M2 21a7 7 0 0 1 14 0" /><path d="M16 11l2 2 4-4" /></Svg>],
   ['leaves', 'Leaves', <Svg w={22} sw={1.9}><path d="M8 7V3M16 7V3" /><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8.5 14.5l2.3 2.3 4.7-4.8" /></Svg>],
   ['calendar', 'Calendar', <Svg w={22} sw={1.9}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></Svg>],
 ];
@@ -88,6 +89,10 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [loadError, setLoadError] = useState('');
   const [attendance, setAttendance] = useState<Attendance | undefined>();
   const [attReady, setAttReady] = useState(false);
+  const [officeStart, setOfficeStart] = useState('09:00');
+  const [lateGrace, setLateGrace] = useState(15);
+  const [dayRows, setDayRows] = useState<Attendance[]>([]);
+  const [dayLoading, setDayLoading] = useState(false);
 
   // ---------- data ----------
   // The manager's own check-in, same source as the employee home screen.
@@ -122,6 +127,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       setEmployees(emps.filter(e => e.role === 'EMPLOYEE' && e.status !== 'INACTIVE').sort((a, b) => (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' })));
       setLeaveTypes(types);
       if (cfg?.workingDays?.length) setWorkingDays(cfg.workingDays);
+      if (cfg?.officeStartTime) setOfficeStart(cfg.officeStartTime);
+      if (typeof cfg?.lateGracePeriod === 'number') setLateGrace(cfg.lateGracePeriod);
     }).catch(e => alive && setLoadError(e instanceof Error ? e.message : 'Could not load your data.'));
     const tick = () => { if (!document.hidden) { void loadLeaves().catch(() => {}); } };
     const timer = window.setInterval(tick, 30000);
@@ -133,6 +140,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const isWk = (d: Date) => workingDays.includes(DAYL[d.getDay()]);
   const holidayOn = (d: string) => holidays.filter(h => h.date === d);
   const onLeave = (empId: string, d: string) => leaves.some(l => l.employeeId === empId && l.status === 'APPROVED' && l.startDate <= d && l.endDate >= d);
+
 
   // ---------- toast ----------
   const [toast, setToast] = useState<{ msg: string; undo?: () => void } | null>(null);
@@ -180,6 +188,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [calY, setCalY] = useState(() => new Date().getFullYear());
   const [calM, setCalM] = useState(() => new Date().getMonth());
   const [selDay, setSelDay] = useState(() => ymd(new Date()));
+  const [attDate, setAttDate] = useState(() => ymd(new Date()));
   const [sheetText, setSheetText] = useState('');
   const [evK, setEvK] = useState<'ev' | 'hd'>('ev');
   const [evTitle, setEvTitle] = useState('');
@@ -188,6 +197,15 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const swipe = useRef(new Map<string, { x0: number; y0: number; dx: number; on: boolean; dead: boolean; at: number }>());
   const openTask = (id: string) => { setSheetText(allTasks.find(t => t.id === id)?.description || ''); setSheet({ kind: 'task', id }); };
   const openEvent = () => { setEvK('ev'); setEvTitle(''); setEvDate(selDay); setSheet({ kind: 'event' }); };
+  useEffect(() => {
+    if (route !== 'attendance') return;
+    let alive = true;
+    const load = () => { setDayLoading(true); hrService.getAttendance({ since: attDate, until: attDate })
+      .then(rows => { if (alive) setDayRows(rows); }).catch(() => {}).finally(() => alive && setDayLoading(false)); };
+    load();
+    const timer = window.setInterval(() => { if (!document.hidden) load(); }, 60000);
+    return () => { alive = false; clearInterval(timer); };
+  }, [route, attDate]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key !== 'Escape') return; if (pop) setPop(null); else setSheet(null); };
     document.addEventListener('keydown', key); return () => document.removeEventListener('keydown', key);
@@ -252,6 +270,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       {loadError && <p className="alert" role="alert">{loadError}</p>}
       {AttendanceCard()}
       {route === 'tasks' && TasksView()}
+      {route === 'attendance' && AttendanceView()}
       {route === 'leaves' && LeavesView()}
       {route === 'calendar' && CalendarView()}
     </main>
@@ -586,6 +605,54 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       <input className="inp" type="date" id="evD" value={date} onChange={e => setDate(e.target.value)} />
       {k === 'hd' && <p className="small">Holidays are shared with the whole company and are not counted as working days for leave.</p>}
       <button className="btn pri lg wide" style={{ marginTop: 18 }} disabled={!title.trim() || !date || busy} onClick={() => void go()}>{busy ? 'Adding…' : 'Add to calendar'}</button>
+    </>;
+  }
+
+  function AttendanceView() {
+    const d = attDate, day = parse(d), working = isWk(day), hols = holidayOn(d);
+    // One line per employee: first check-in, last check-out, still in if any session is open.
+    const byEmp = new Map<string, Attendance[]>();
+    dayRows.filter(r => r.date === d && r.checkIn).forEach(r => byEmp.set(r.employeeId, [...(byEmp.get(r.employeeId) || []), r]));
+    const toMin = (t?: string) => { if (!t) return null; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const lateAfter = (toMin(officeStart) ?? 540) + lateGrace;
+    const present = employees.filter(e => byEmp.has(e.id)).map(e => {
+      const rs = [...byEmp.get(e.id)!].sort((a, b) => (a.checkIn || '').localeCompare(b.checkIn || ''));
+      const first = rs[0], open = rs.some(r => !r.checkOut);
+      const lastOut = open ? undefined : rs.map(r => r.checkOut || '').sort().pop();
+      const late = rs.some(r => r.status === 'LATE') || (toMin(first.checkIn)! > lateAfter);
+      return { e, in: first.checkIn!, out: lastOut, open, late };
+    }).sort((a, b) => a.in.localeCompare(b.in));
+    const leaveOf = (id: string) => leaves.find(l => l.employeeId === id && l.status === 'APPROVED' && l.startDate <= d && l.endDate >= d);
+    const onLeaveList = employees.filter(e => !byEmp.has(e.id) && leaveOf(e.id));
+    const missing = employees.filter(e => !byEmp.has(e.id) && !leaveOf(e.id));
+    const lateCount = present.filter(p => p.late).length;
+    const off = !working || hols.length > 0;
+    const shift = (n: number) => setAttDate(ymd(addDays(day, n)));
+    return <>
+      <div className="ph"><div><h1>Attendance</h1><p>{d === T0 ? 'Today' : dshort(d)} · {present.length} present{lateCount ? ` (${lateCount} late)` : ''} · {onLeaveList.length} on leave · {off ? 'day off' : `${missing.length} not checked in`}</p></div></div>
+      <div className="card"><div className="ch" style={{ padding: '6px 6px 6px 14px' }}>
+        <h2>{d === T0 ? `Today · ${dshort(d)}` : dshort(d)}</h2>
+        <div className="n"><button className="ibtn" aria-label="Previous day" onClick={() => shift(-1)}>{I.l}</button>
+          <label className="btn ghost" style={{ height: 36, padding: '0 10px', position: 'relative' }}>{I.cal}<span className="vh">Pick a date</span>
+            <input type="date" aria-label="Pick a date" value={d} max={T0} onChange={e => e.target.value && setAttDate(e.target.value)} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} /></label>
+          {d !== T0 && <button className="btn ghost" style={{ height: 36, padding: '0 10px' }} onClick={() => setAttDate(T0)}>Today</button>}
+          <button className="ibtn" aria-label="Next day" disabled={d >= T0} onClick={() => shift(1)}>{I.r}</button></div>
+      </div></div>
+      {off && <p className="small" style={{ margin: '10px 4px 0' }}>{hols.length ? `Holiday: ${hols.map(h => h.name).join(', ')}` : 'Not a working day'}. Nobody is expected to check in.</p>}
+      {dayLoading && !dayRows.length ? <p className="loading" role="status">Loading attendance…</p> : <>
+        <div className="sec"><h2>Present</h2><span>{present.length}</span></div>
+        <div className="list">{present.length ? present.map(p => <div className="rw" key={p.e.id}><span className="av sm">{ini(p.e.name)}</span>
+          <div className="t"><b>{p.e.name}</b><span>In {p.in} · {p.open ? 'Still in' : p.out ? `Out ${p.out}` : ''}</span></div>
+          {p.late ? <span className="st warn">Late</span> : p.open ? <span className="st ok">In office</span> : null}</div>)
+          : <div className="empty">Nobody has checked in{d === T0 ? ' yet' : ''}</div>}</div>
+        {onLeaveList.length > 0 && <><div className="sec"><h2>On leave</h2><span>{onLeaveList.length}</span></div>
+          <div className="list">{onLeaveList.map(e => { const l = leaveOf(e.id)!; return <div className="rw" key={e.id}><span className="av sm">{ini(e.name)}</span>
+            <div className="t"><b>{e.name}</b><span>{typeName(l.type)} leave · {range(l.startDate, l.endDate)}</span></div></div>; })}</div></>}
+        {!off && <><div className={`sec${missing.length ? ' over' : ''}`}><h2>Not checked in</h2><span>{missing.length}</span></div>
+          <div className="list">{missing.length ? missing.map(e => <div className="rw" key={e.id}><span className="av sm">{ini(e.name)}</span>
+            <div className="t"><b>{e.name}</b><span>{e.designation || 'Employee'}</span></div><span className="st bad">Absent</span></div>)
+            : <div className="empty">Everyone is accounted for</div>}</div></>}
+      </>}
     </>;
   }
 

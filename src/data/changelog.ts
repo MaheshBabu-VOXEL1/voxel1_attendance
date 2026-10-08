@@ -16,6 +16,13 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-10-08',
+    title: 'Attendance tab for managers',
+    entries: [
+      { type: 'feature', description: 'The manager app has an Attendance tab: who is present (check-in and check-out time, Late, still in office), who is on approved leave, and who has not checked in, for today or any earlier date.' },
+    ],
+  },
+  {
+    date: '2026-10-08',
     title: 'Manager check-in',
     entries: [
       { type: 'feature', description: 'Managers can check in and check out from the top of the manager app, using the same attendance flow as employees.' },

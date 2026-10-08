@@ -26,7 +26,7 @@ vi.mock('../../services/hrService', () => ({ hrService: {
   getLeaveBalance: vi.fn(async () => ({ employeeId: 'e1', CASUAL_SICK: 5, PAID: 7 })),
   getLeaveTypes: async () => [{ id: 'CASUAL_SICK', name: 'Casual & Sick Leave', color: '', hasBalance: true }, { id: 'PAID', name: 'Paid Leave', color: '', hasBalance: true }],
   getConfig: async () => ({ workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] }),
-  getHolidays: async () => [{ id: 'h1', date: today, name: 'Company day', isGovernment: false, type: 'FESTIVAL' }],
+  getHolidays: vi.fn(async () => [{ id: 'h1', date: today, name: 'Company day', isGovernment: false, type: 'FESTIVAL' }]),
   updateLeaveStatus: vi.fn(async () => {}),
   getActiveAttendance: vi.fn(async () => null),
   getAttendance: vi.fn(async () => []),
@@ -68,6 +68,24 @@ describe('manager app', () => {
     expect(await screen.findByText('Checked in')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Check out' }));
     expect(nav).toHaveBeenCalledWith('attendance-finish');
+  });
+
+  it('shows who is present, late and not checked in on the Attendance tab', async () => {
+    vi.mocked(hrService.getHolidays).mockResolvedValueOnce([]);
+    vi.mocked(hrService.getAttendance).mockImplementation(async (o: any) => o?.employeeId ? [] : [
+      { id: 'a1', employeeId: 'e1', date: today, checkIn: '09:40', status: 'PRESENT' } as any,
+    ]);
+    render(<ManagerApp user={user} onNavigate={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));
+    const present = await screen.findByText('In 09:40 · Still in');
+    expect(present.closest('.rw')!.textContent).toContain('Divya Kallepalli');
+    expect(present.closest('.rw')!.textContent).toContain('Late');
+    const absent = screen.getByRole('heading', { name: 'Not checked in' }).parentElement!.nextElementSibling!;
+    expect(absent.textContent).toContain('Ravi');
+    expect(absent.textContent).not.toContain('Divya');
+    expect(absent.textContent).not.toContain('Test Manager');
+    fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
+    await waitFor(() => expect(hrService.getAttendance).toHaveBeenCalledWith(expect.objectContaining({ since: expect.not.stringMatching(today) })));
   });
 
   it('adds a task to the backlog when no person is chosen', async () => {
