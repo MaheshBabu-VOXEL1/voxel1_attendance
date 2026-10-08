@@ -4,11 +4,10 @@ import TeamTasks from '../TeamTasks';
 import { employeeService } from '../../services/employee.service';
 import { assignedTaskService } from '../../services/assignedTask.service';
 vi.mock('../../services/employee.service', () => ({ employeeService: { getEmployees: vi.fn() } }));
-vi.mock('../../services/assignedTask.service', () => ({ assignedTaskService: { list: vi.fn(), assign: vi.fn(), listProjects: vi.fn() }, statusLabel: { NOT_STARTED: 'Not started', START: 'Started', PROGRESS: 'In progress', END: 'Completed' } }));
+vi.mock('../../services/assignedTask.service', () => ({ assignedTaskService: { list: vi.fn(), assign: vi.fn() }, statusLabel: { NOT_STARTED: 'Not started', START: 'Started', PROGRESS: 'In progress', END: 'Completed' } }));
 describe('manager task assignments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(assignedTaskService.listProjects).mockResolvedValue([]);
     vi.mocked(assignedTaskService.list).mockResolvedValue([]);
     vi.mocked(employeeService.getEmployees).mockResolvedValue([
       { id: 'mine', name: 'My Employee', role: 'EMPLOYEE', lineManagerId: 'manager', status: 'ACTIVE' },

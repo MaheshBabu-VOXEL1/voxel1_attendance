@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { User, Employee } from '../types';
 import { employeeService } from '../services/employee.service';
-import { assignedTaskService, statusLabel, TaskStatus, TaskProject } from '../services/assignedTask.service';
+import { assignedTaskService, statusLabel, TaskStatus } from '../services/assignedTask.service';
 import { useAssignedTasks } from '../hooks/useAssignedTasks';
 import { AssignedTaskList } from '../components/tasks/AssignedTaskList';
 import { Download } from 'lucide-react';
@@ -11,7 +11,6 @@ import { downloadWorkbook, indiaDate, taskSheet } from '../utils/monthlyReports'
 export default function TeamTasks({ user, initialTab }: { user: User; initialTab?: string }) {
   const [tab, setTab] = useState<'ASSIGN' | 'PROGRESS' | 'EMPLOYEE'>(initialTab === 'PROGRESS' || initialTab === 'EMPLOYEE' ? initialTab : 'ASSIGN');
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [savedProjects, setSavedProjects] = useState<TaskProject[]>([]);
   const [employeeId, setEmployeeId] = useState('');
   const [description, setDescription] = useState('');
   const [project, setProject] = useState('');
@@ -29,7 +28,7 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
   // Progress shows tasks the manager assigned; Employee Task shows tasks employees wrote themselves (My Task).
   const tasks = allTasks.filter(t => !t.self_created);
   const employeeTasks = allTasks.filter(t => t.self_created);
-  const projects = Array.from(new Set([...savedProjects.map(p => p.name), ...allTasks.map(t => t.project_name).filter((name): name is string => !!name)])).sort((a, b) => a.localeCompare(b));
+  const projects = Array.from(new Set(allTasks.map(t => t.project_name).filter((name): name is string => !!name))).sort((a, b) => a.localeCompare(b));
   const projectName = project === '__new__' ? newProject.trim() : project;
   const visibleTasks = (tab === 'EMPLOYEE' ? employeeTasks : tasks)
     .filter(t => !projectFilter || t.project_name === projectFilter)
@@ -38,7 +37,6 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
       : b.created.localeCompare(a.created));
   useEffect(() => {
     let active = true;
-    assignedTaskService.listProjects().then(rows => { if (active) setSavedProjects(rows); }).catch(e => active && setFormError(e.message));
     employeeService.getEmployees().then(rows => {
       // Managers can assign to any active employee in the organization, not only direct reports.
       if (active) setEmployees(rows.filter(e => e.role === 'EMPLOYEE' && e.status !== 'INACTIVE'));
@@ -83,7 +81,7 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
           <thead className="bg-slate-50 text-slate-600"><tr>{['Project UID', 'Project Selection', 'Task Description', 'Due Date', 'Person', 'Status'].map(label => <th key={label} scope="col" className="border border-slate-200 p-3 font-semibold">{label}</th>)}</tr></thead>
           <tbody>
             <tr className="align-top">
-              <td className="border border-slate-200 p-3 min-w-24"><span className="block text-sm text-slate-500" title="A permanent project number is assigned when saved">{savedProjects.find(p => p.name === project)?.project_number ?? allTasks.find(t => t.project_name === project)?.project_number ?? 'On save'}</span></td>
+              <td className="border border-slate-200 p-3 min-w-24"><span className="block text-sm text-slate-500" title="A permanent project number is assigned when saved">{allTasks.find(t => t.project_name === project)?.project_number ?? 'On save'}</span></td>
               <td className="border border-slate-200 p-3 min-w-48"><select aria-label="Project Selection" required value={project} disabled={saving || loading} onChange={e => setProject(e.target.value)} className="min-h-12 w-full rounded-lg border border-slate-200 bg-white p-2"><option value="">Choose a project</option>{projects.map(name => <option key={name} value={name}>{name}</option>)}<option value="__new__">+ Add new project</option></select>
                 {project === '__new__' && <input aria-label="New project name" required maxLength={200} value={newProject} disabled={saving} onChange={e => setNewProject(e.target.value)} placeholder="New project name" className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 p-2" />}</td>
               <td className="border border-slate-200 p-3 min-w-64"><textarea aria-label="Task Description" required maxLength={4000} rows={3} value={description} onChange={e => setDescription(e.target.value)} disabled={saving} placeholder="Describe the task" className="w-full rounded-lg border border-slate-200 p-2" /></td>
