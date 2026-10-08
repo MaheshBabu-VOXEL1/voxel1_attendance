@@ -16,6 +16,13 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-10-08',
+    title: 'Manager check-in',
+    entries: [
+      { type: 'feature', description: 'Managers can check in and check out from the top of the manager app, using the same attendance flow as employees.' },
+    ],
+  },
+  {
+    date: '2026-10-08',
     title: 'New manager app: Tasks, Leaves, Calendar',
     entries: [
       { type: 'feature', description: 'Managers get a new mobile-first app with three tabs. Tasks: quick add with project, person and due date; group by date, person or project; search; change status, person, due date or project from each row; edit or delete a task; swipe right for done or left to change the date.' },

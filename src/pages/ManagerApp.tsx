@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { User, Employee, LeaveRequest, CustomLeaveType, Holiday, LeaveBalance } from '../types';
+import { User, Employee, LeaveRequest, CustomLeaveType, Holiday, LeaveBalance, Attendance } from '../types';
 import { employeeService } from '../services/employee.service';
 import { hrService } from '../services/hrService';
 import { assignedTaskService, AssignedTask, TaskStatus } from '../services/assignedTask.service';
@@ -68,7 +68,7 @@ const NAV: [Route, string, React.ReactNode][] = [
 interface MenuItem { v: string; label: string; sub?: string; lead?: React.ReactNode; on?: boolean; muted?: boolean; sep?: boolean }
 interface Pop { anchor: HTMLElement; kind: 'menu' | 'due'; head?: React.ReactNode; items?: MenuItem[]; cur?: string | null; pick: (v: string) => void }
 
-export default function ManagerApp({ user }: { user: User }) {
+export default function ManagerApp({ user, onNavigate }: { user: User; onNavigate?: (path: string) => void }) {
   const { darkMode, setDarkModePreference } = useTheme();
   const { logout } = useAuth();
   const T0 = ymd(new Date());
@@ -86,8 +86,21 @@ export default function ManagerApp({ user }: { user: User }) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [workingDays, setWorkingDays] = useState<string[]>(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']);
   const [loadError, setLoadError] = useState('');
+  const [attendance, setAttendance] = useState<Attendance | undefined>();
+  const [attReady, setAttReady] = useState(false);
 
   // ---------- data ----------
+  // The manager's own check-in, same source as the employee home screen.
+  const loadAttendance = useCallback(async () => {
+    const [active, logs] = await Promise.all([hrService.getActiveAttendance(user.id), hrService.getAttendance({ employeeId: user.id, since: T0, until: T0 })]);
+    setAttendance(active || logs.filter(l => l.date === T0).sort((a, b) => (b.checkIn || '').localeCompare(a.checkIn || ''))[0]);
+    setAttReady(true);
+  }, [user.id, T0]);
+  useEffect(() => {
+    void loadAttendance().catch(() => setAttReady(true));
+    const onFocus = () => { void loadAttendance().catch(() => {}); };
+    window.addEventListener('focus', onFocus); return () => window.removeEventListener('focus', onFocus);
+  }, [loadAttendance]);
   const loadLeaves = useCallback(async () => {
     const rows = await hrService.getLeaves();
     setLeaves(rows);
@@ -237,6 +250,7 @@ export default function ManagerApp({ user }: { user: User }) {
     </div></header>
     <main>
       {loadError && <p className="alert" role="alert">{loadError}</p>}
+      {AttendanceCard()}
       {route === 'tasks' && TasksView()}
       {route === 'leaves' && LeavesView()}
       {route === 'calendar' && CalendarView()}
@@ -573,6 +587,15 @@ export default function ManagerApp({ user }: { user: User }) {
       {k === 'hd' && <p className="small">Holidays are shared with the whole company and are not counted as working days for leave.</p>}
       <button className="btn pri lg wide" style={{ marginTop: 18 }} disabled={!title.trim() || !date || busy} onClick={() => void go()}>{busy ? 'Adding…' : 'Add to calendar'}</button>
     </>;
+  }
+
+  function AttendanceCard() {
+    const active = !!attendance?.checkIn && !attendance.checkOut;
+    const at = active ? attendance?.checkIn : attendance?.checkOut;
+    return <div className="att"><div className="att-l"><span className={`dot${active ? '' : ' off'}`} />
+      <div><b>{!attReady ? 'Loading attendance…' : active ? 'Checked in' : attendance?.checkOut ? 'Checked out' : 'Not checked in'}</b><span>{at ? `at ${at}` : 'Start your day'}</span></div></div>
+      <button className={`btn att-btn ${active ? 'out' : 'in'}`} disabled={!attReady || !onNavigate}
+        onClick={() => onNavigate?.(active ? 'attendance-finish' : 'attendance-quick-office')}>{active ? 'Check out' : 'Check in'}</button></div>;
   }
 
   function AccountSheet() {

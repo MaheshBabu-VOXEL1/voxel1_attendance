@@ -28,6 +28,8 @@ vi.mock('../../services/hrService', () => ({ hrService: {
   getConfig: async () => ({ workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] }),
   getHolidays: async () => [{ id: 'h1', date: today, name: 'Company day', isGovernment: false, type: 'FESTIVAL' }],
   updateLeaveStatus: vi.fn(async () => {}),
+  getActiveAttendance: vi.fn(async () => null),
+  getAttendance: vi.fn(async () => []),
 } }));
 vi.mock('../../services/calendar.service', () => ({ calendarService: {
   listEvents: vi.fn(async () => []), addEvent: vi.fn(async () => ({})), deleteEvent: vi.fn(), addHoliday: vi.fn(), deleteHoliday: vi.fn(async () => {}),
@@ -49,6 +51,23 @@ describe('manager app', () => {
     expect(screen.getByText('Review shaft sizes')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'No due date' })).toBeInTheDocument();
     await waitFor(() => expect(within(screen.getByRole('navigation')).getByText('1')).toBeInTheDocument());
+  });
+
+  it('shows the manager check-in card and opens the attendance flow', async () => {
+    const nav = vi.fn();
+    render(<ManagerApp user={user} onNavigate={nav} />);
+    expect(await screen.findByText('Not checked in')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Check in' }));
+    expect(nav).toHaveBeenCalledWith('attendance-quick-office');
+  });
+
+  it('offers check out once the manager is checked in', async () => {
+    vi.mocked(hrService.getActiveAttendance).mockResolvedValueOnce({ checkIn: '09:05', date: today } as any);
+    const nav = vi.fn();
+    render(<ManagerApp user={user} onNavigate={nav} />);
+    expect(await screen.findByText('Checked in')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Check out' }));
+    expect(nav).toHaveBeenCalledWith('attendance-finish');
   });
 
   it('adds a task to the backlog when no person is chosen', async () => {

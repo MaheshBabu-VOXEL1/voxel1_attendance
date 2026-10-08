@@ -317,7 +317,7 @@ const AppContent: React.FC = () => {
   const renderContent = () => {
     if (user.role === 'EMPLOYEE' && currentPath !== 'attendance') return <EmployeeDay user={user} onNavigate={handleNavigate} />;
     // Managers use the Tasks / Leaves / Calendar app only.
-    if (user.role === 'MANAGER') return <ManagerApp user={user} />;
+    if (user.role === 'MANAGER' && currentPath !== 'attendance') return <ManagerApp user={user} onNavigate={handleNavigate} />;
     switch (currentPath) {
       case 'dashboard': return user.role === 'EMPLOYEE'
         ? <AttendanceLeaves user={user} tab="ATTENDANCE" onNavigate={handleNavigate} />

@@ -251,6 +251,15 @@ main{max-width:720px;margin:0 auto;padding:16px 16px calc(92px + env(safe-area-i
 @media (min-width:640px){ .day{height:64px} .tools .seg button{padding:0 16px} }
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 /* app additions */
+.att{margin-bottom:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 12px 12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.att-l{display:flex;align-items:center;gap:10px;min-width:0}
+.att-l b{display:block;font-size:15.5px;font-weight:700;color:var(--ink)}
+.att-l span{font-size:13px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}
+.dot.off{background:var(--faint)}
+.att-btn{height:44px;padding:0 18px;font-size:15px;flex:none;color:#fff}
+.att-btn.in{background:var(--go);border-color:var(--go)}
+.att-btn.out{background:var(--stop);border-color:var(--stop)}
 .pjin{flex:none;width:130px;height:40px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);padding:0 10px;font-size:13px;font-weight:600;color:var(--ink)}
 .ro{font-size:11.5px;font-weight:700;color:var(--faint);margin-left:2px}
 .loading{padding:40px 16px;text-align:center;color:var(--muted)}
