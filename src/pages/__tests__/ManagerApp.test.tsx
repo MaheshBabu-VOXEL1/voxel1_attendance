@@ -148,8 +148,8 @@ describe('manager app', () => {
     expect(await dotFor(/Ravi/)).toContain('arc');
     expect(await dotFor(/Divya/)).toContain('mep');
     expect(await dotFor(/Abhinay/)).toContain('it');
-    expect(await dotFor(/Maruthi/)).toContain('mgr');
-    expect(await dotFor(/Test Manager/)).toContain('mgr');
+    expect(await dotFor(/Maruthi/)).toContain('grey');
+    expect(await dotFor(/Test Manager/)).toContain('grey');
   });
 
   it('picks a saved project from the dropdown and creates a new one with + New project', async () => {

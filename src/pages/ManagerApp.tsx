@@ -151,7 +151,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const dot = (id?: string | null) => {
     const m = people.find(e => e.id === id);
     const d = (m?.department || '').toUpperCase();
-    const c = !m || m.role === 'MANAGER' || switchIds.has(m.id) ? 'mgr' : d === 'ARC' ? 'arc' : d === 'MEP' ? 'mep' : d === 'IT' ? 'it' : 'mgr';
+    const c = !m || m.role === 'MANAGER' || switchIds.has(m.id) ? 'grey' : d === 'ARC' ? 'arc' : d === 'MEP' ? 'mep' : d === 'IT' ? 'it' : 'grey';
     return <span className={`pdot ${c}`} aria-hidden="true" />;
   };
   const typeName = (id: string) => (leaveTypes.find(t => t.id === id)?.name || id).replace(/ Leave$/, '');
