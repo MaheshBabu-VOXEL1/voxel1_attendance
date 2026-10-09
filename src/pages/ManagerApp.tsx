@@ -738,13 +738,15 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     </>;
   }
 
+  // Managers don't check in. The card only appears to finish a check-in made
+  // in Employee mode before switching to Manager.
   function AttendanceCard() {
-    const active = !!attendance?.checkIn && !attendance.checkOut;
-    const at = active ? attendance?.checkIn : attendance?.checkOut;
-    return <div className="mycheck"><div className="att-l"><span className={`dot${active ? '' : ' off'}`} />
-      <div><b>{!attReady ? 'Loading attendance…' : active ? 'Checked in' : attendance?.checkOut ? 'Checked out' : 'Not checked in'}</b><span>{at ? `at ${at}` : 'Start your day'}</span></div></div>
-      <button className={`btn att-btn ${active ? 'out' : 'in'}`} disabled={!attReady || !onNavigate}
-        onClick={() => onNavigate?.(active ? 'attendance-finish' : 'attendance-quick-office')}>{active ? 'Check out' : 'Check in'}</button></div>;
+    const active = attReady && !!attendance?.checkIn && !attendance.checkOut;
+    if (!active) return null;
+    return <div className="mycheck"><div className="att-l"><span className="dot" />
+      <div><b>Checked in</b><span>at {attendance?.checkIn}</span></div></div>
+      <button className="btn att-btn out" disabled={!onNavigate}
+        onClick={() => onNavigate?.('attendance-finish')}>Check out</button></div>;
   }
 
   function AccountSheet() {

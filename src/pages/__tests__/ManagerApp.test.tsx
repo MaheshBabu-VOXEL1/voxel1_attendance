@@ -72,12 +72,11 @@ describe('manager app', () => {
     await waitFor(() => expect(within(screen.getByRole('navigation')).getByText('1')).toBeInTheDocument());
   });
 
-  it('shows the manager check-in card and opens the attendance flow', async () => {
-    const nav = vi.fn();
-    render(<ManagerApp user={user} onNavigate={nav} />);
-    expect(await screen.findByText('Not checked in')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Check in' }));
-    expect(nav).toHaveBeenCalledWith('attendance-quick-office');
+  it('does not offer check in to a manager', async () => {
+    render(<ManagerApp user={user} onNavigate={vi.fn()} />);
+    await waitFor(() => expect(hrService.getActiveAttendance).toHaveBeenCalled());
+    expect(screen.queryByText('Not checked in')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Check in' })).not.toBeInTheDocument();
   });
 
   it('offers check out once the manager is checked in', async () => {
