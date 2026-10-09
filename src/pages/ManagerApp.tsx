@@ -82,6 +82,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [employees, setEmployees] = useState<Employee[]>([]);
   // Everyone who can be given a task: all employees and managers, the signed-in manager included.
   const [people, setPeople] = useState<Employee[]>([]);
+  const [switchIds, setSwitchIds] = useState<Set<string>>(new Set());
   // An account-switch member in Manager mode also decides other people's leave.
   const [coDecider, setCoDecider] = useState(false);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
@@ -131,6 +132,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       // Account-switch members stay assignable while they are in Manager mode.
       const sw = new Set(switchers);
       setCoDecider(sw.has(user.id));
+      setSwitchIds(sw);
       const byName = (a: Employee, b: Employee) => (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' });
       setEmployees(emps.filter(e => (e.role === 'EMPLOYEE' || sw.has(e.id)) && e.status !== 'INACTIVE').sort(byName));
       setPeople(emps.filter(e => (e.role === 'EMPLOYEE' || e.role === 'MANAGER') && e.status !== 'INACTIVE').sort(byName));
@@ -145,6 +147,13 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   }, [loadLeaves, loadCalendar]);
 
   const empName = (id?: string | null) => people.find(e => e.id === id)?.name || '';
+  // Discipline colour: ARC blue, MEP green, IT red; managers and account-switch members grey.
+  const dot = (id?: string | null) => {
+    const m = people.find(e => e.id === id);
+    const d = (m?.department || '').toUpperCase();
+    const c = !m || m.role === 'MANAGER' || switchIds.has(m.id) ? 'mgr' : d === 'ARC' ? 'arc' : d === 'MEP' ? 'mep' : d === 'IT' ? 'it' : 'mgr';
+    return <span className={`pdot ${c}`} aria-hidden="true" />;
+  };
   const typeName = (id: string) => (leaveTypes.find(t => t.id === id)?.name || id).replace(/ Leave$/, '');
   const isWk = (d: Date) => workingDays.includes(DAYL[d.getDay()]);
   const holidayOn = (d: string) => holidays.filter(h => h.date === d);
@@ -293,7 +302,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
 
   const menuWho = (anchor: HTMLElement, cur: string | null, pick: (v: string) => void) => openPop({
     anchor, kind: 'menu', head: <>{I.user}Assign to</>, pick,
-    items: [...people.map(m => ({ v: m.id, label: m.id === user.id ? `${m.name} (me)` : m.name, lead: <span className="pav">{I.user}</span>, sub: onLeave(m.id, T0) ? 'On leave' : `${tasks.filter(t => t.employee_id === m.id && t.status !== 'END').length} open`, on: cur === m.id })),
+    items: [...people.map(m => ({ v: m.id, label: m.id === user.id ? `${m.name} (me)` : m.name, lead: <span className="pav">{dot(m.id)}</span>, sub: onLeave(m.id, T0) ? 'On leave' : `${tasks.filter(t => t.employee_id === m.id && t.status !== 'END').length} open`, on: cur === m.id })),
       ...(cur ? [{ v: '', label: '', sep: true }, { v: '', label: 'Unassign', sub: 'Back to backlog', muted: true }] : [])],
   });
   const menuProject = (anchor: HTMLElement, cur: string, pick: (v: string) => void, all = false) => openPop({
@@ -394,7 +403,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       } catch (e) { fail(e); } finally { setAdding(false); }
     };
 
-    type G = { t: string; l: AssignedTask[]; cls?: string; hide?: string; note?: string; keep?: boolean };
+    type G = { t: string; l: AssignedTask[]; cls?: string; hide?: string; note?: string; keep?: boolean; who?: string };
     const groups: G[] = [];
     if (groupBy === 'date') {
       ([['Overdue', (t: AssignedTask) => !!t.due_date && t.due_date < T0, 'over', ''], ['Today', (t: AssignedTask) => t.due_date === T0, '', 'due'],
@@ -402,7 +411,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         ['No due date', (t: AssignedTask) => !t.due_date, '', 'due']] as [string, (t: AssignedTask) => boolean, string, string][])
         .forEach(([t, f, cls, hide]) => groups.push({ t, l: open.filter(f).sort(byDue), cls, hide }));
     } else if (groupBy === 'person') {
-      people.forEach(m => { const l = open.filter(t => t.employee_id === m.id).sort(byDue); if (l.length || onLeave(m.id, T0)) groups.push({ t: m.name, l, hide: 'who', keep: true, note: onLeave(m.id, T0) ? 'On leave today' : undefined }); });
+      people.forEach(m => { const l = open.filter(t => t.employee_id === m.id).sort(byDue); if (l.length || onLeave(m.id, T0)) groups.push({ t: m.name, l, hide: 'who', keep: true, who: m.id, note: onLeave(m.id, T0) ? 'On leave today' : undefined }); });
       groups.push({ t: 'Unassigned', l: open.filter(t => !t.employee_id).sort(byDue), hide: 'who' });
     } else {
       projects.filter(p => pfilter === 'all' || p === pfilter).forEach(p => groups.push({ t: p, l: open.filter(t => t.project_name === p).sort(byDue), hide: 'p' }));
@@ -427,7 +436,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         </div>
         <div className="c2">
           <button type="button" className={`chipbtn${cpWho ? ' set' : ''}`} aria-haspopup="listbox" onClick={e => menuWho(e.currentTarget, cpWho || null, v => setCpWho(v))}>
-            {I.user}<span>{cpWho ? empName(cpWho) : 'Assign'}</span>{I.down}</button>
+            {cpWho ? dot(cpWho) : I.user}<span>{cpWho ? empName(cpWho) : 'Assign'}</span>{I.down}</button>
           {DueSeg(cpDue || null, v => setCpDue(v))}
         </div>
       </div>
@@ -446,7 +455,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         <button className="ibtn" aria-label="Close search" style={{ width: 36, height: 36 }} onClick={() => { setSearchOn(false); setQ(''); }}>{I.cross}</button></div>}
       {tasksLoading ? <p className="loading" role="status">Loading tasks…</p> : <>
         {shown.map(g => <React.Fragment key={g.t}>
-          <div className={`sec${g.cls ? ` ${g.cls}` : ''}`}><h2>{g.t}</h2><span>{g.note || g.l.length}</span></div>
+          <div className={`sec${g.cls ? ` ${g.cls}` : ''}`}><h2>{g.who && dot(g.who)}{g.t}</h2><span>{g.note || g.l.length}</span></div>
           {g.l.length > 0 && <div className="list">{g.l.map(t => <React.Fragment key={t.id}>{TaskRow(t, g.hide)}</React.Fragment>)}</div>}
         </React.Fragment>)}
         {!shown.length && <div className="card empty" style={{ marginTop: 16 }}>{q ? `No tasks match “${q}”` : `No open tasks${pfilter === 'all' ? '' : ` on ${pfilter}`}`}</div>}
@@ -470,7 +479,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     const bits: React.ReactNode[] = [];
     if (hide !== 'p') bits.push(<span key="p" className="mp">{t.project_name || 'No project'}</span>);
     if (hide !== 'who') bits.push(<button key="w" className={`mb${t.employee_id ? '' : ' ph'}`} disabled={!edit}
-      onClick={e => menuWho(e.currentTarget, t.employee_id, v => void update(t, { who: v || null }))}>{I.userS}{t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Assign'}</button>);
+      onClick={e => menuWho(e.currentTarget, t.employee_id, v => void update(t, { who: v || null }))}>{t.employee_id ? dot(t.employee_id) : I.userS}{t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Assign'}</button>);
     if (isDone) bits.push(<span key="d" className="mp" style={{ color: 'var(--ok)' }}>Done {doneOn === T0 ? 'today' : doneOn ? short(doneOn) : ''}</span>);
     else if (hide !== 'due' || dueInfo?.c === 'over') bits.push(<button key="d" className={`mb${dueInfo ? (dueInfo.c ? ` ${dueInfo.c}` : '') : ' ph'}`} disabled={!edit}
       onClick={e => dueBar(e.currentTarget, t.due_date ?? null, v => void update(t, { due: v || null }))}>{I.calS}{dueInfo ? dueInfo.x : 'Due date'}</button>);
@@ -523,7 +532,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       {!edit && <p className="small">{t.self_created ? 'Written by the employee. Only they can change it.' : 'Created by another manager. Only they can change it.'}</p>}
       <div className="fields">
         <div className="f"><span>Status</span><button className="fv" disabled={!edit && t.employee_id !== user.id} aria-haspopup="listbox" onClick={e => menuStatus(e.currentTarget, t.status, v => void update(t, { s: v as TaskStatus }))}>{SIC[t.status]}<span>{ST[t.status][0]}</span>{I.down}</button></div>
-        <div className="f"><span>Assigned to</span><button className="fv" disabled={!edit} aria-haspopup="listbox" onClick={e => menuWho(e.currentTarget, t.employee_id, v => void update(t, { who: v || null }))}>{I.user}<span>{t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Not assigned'}</span>{I.down}</button></div>
+        <div className="f"><span>Assigned to</span><button className="fv" disabled={!edit} aria-haspopup="listbox" onClick={e => menuWho(e.currentTarget, t.employee_id, v => void update(t, { who: v || null }))}>{t.employee_id ? dot(t.employee_id) : I.user}<span>{t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Not assigned'}</span>{I.down}</button></div>
         <div className="f"><span>Project</span><button className="fv" disabled={!edit} aria-haspopup="listbox" onClick={e => { const a = e.currentTarget; menuProject(a, t.project_name || '', v => { if (v !== '__new__') void update(t, { p: v }); else newProjectBox(a, n => void update(t, { p: n })); }); }}><span>{t.project_name || 'No project'}</span>{I.down}</button></div>
         <div className="f col"><span>Due date{t.due_date ? ` · ${dshort(t.due_date)}` : ''}</span>
           {edit ? DueSeg(t.due_date ?? null, v => void update(t, { due: v || null }), !!t.due_date) : <span>{t.due_date ? dshort(t.due_date) : 'No due date'}</span>}</div>
