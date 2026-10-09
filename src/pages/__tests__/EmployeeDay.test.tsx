@@ -2,6 +2,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import EmployeeDay from '../EmployeeDay';
+vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ login: vi.fn() }) }));
+vi.mock('../../services/supabase', async (original) => { const actual = await original<typeof import('../../services/supabase')>(); return { ...actual, supabase: { ...actual.supabase, rpc: vi.fn(async () => ({ data: false, error: null })) } }; });
 const mocks = vi.hoisted(() => ({ status: vi.fn(), leave: vi.fn(), refresh: vi.fn() }));
 vi.mock('../../context/ThemeContext', () => ({ useTheme: () => ({ darkMode: false }) }));
 vi.mock('../../context/SubscriptionContext', () => ({ useSubscription: () => ({ canPerformAction: () => true }) }));

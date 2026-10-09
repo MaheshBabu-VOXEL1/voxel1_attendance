@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { DEFAULT_LEAVE_TYPES } from '../constants';
 import { ymd } from '../utils/attendanceSheet';
 import './ManagerApp.css';
+import AccountModeSwitch from '../components/AccountModeSwitch';
 
 /* Manager app: Tasks / Leaves / Calendar, built from the voxel1-manager.html design on live data. */
 
@@ -293,7 +294,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
 
   return <div className="mgr" data-theme={darkMode ? 'dark' : 'light'}>
     <header className="bar"><div className="bar-in">
-      <div className="brand"><img alt="" src="/img/employee-day-mark.png" /><b>VOXEL1</b><span>Manager</span></div>
+      <div className="brand"><img alt="" src="/img/employee-day-mark.png" /><b>VOXEL1</b><AccountModeSwitch user={user} /></div>
       <button className="avatar" aria-label="Account" onClick={() => setSheet({ kind: 'account' })}>{ini(user.name || 'Manager')}</button>
     </div></header>
     <main>

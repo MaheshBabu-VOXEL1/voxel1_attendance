@@ -1,0 +1,12 @@
+.account-mode { position: relative; flex-shrink: 0; }
+.account-mode .account-mode-button { display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 6px; border: 1px solid var(--line, #d5dde8); border-radius: 8px; background: var(--surface, white); color: var(--navy, #1c2b4b); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.account-mode-button:disabled { opacity: .6; cursor: wait; }
+.account-mode-button:focus-visible { outline: 2px solid #2f5f92; outline-offset: 2px; }
+.account-mode-track { display: block; width: 28px; height: 16px; border-radius: 20px; background: #8793a6; padding: 2px; }
+.account-mode-track > i { display: block; width: 12px; height: 12px; border-radius: 50%; background: white; transition: transform .15s; }
+[aria-checked="true"] > .account-mode-track { background: #1e7a4a; }
+[aria-checked="true"] > .account-mode-track > i { transform: translateX(12px); }
+.account-mode-error { position: absolute; top: 100%; left: 0; width: min(230px, 65vw); padding: 10px; background: var(--surface, white); color: #b42318; border: 1px solid #b42318; border-radius: 8px; font-size: 12px; z-index: 100; }
+.employee-day .account-brand { display: flex; align-items: center; gap: 8px; }
+.employee-day .appbar-in { gap: 8px; }
+.employee-day .chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

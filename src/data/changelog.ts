@@ -15,6 +15,13 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-10-09',
+    title: 'Employee and manager account switch',
+    entries: [
+      { type: 'feature', description: 'The five authorized mobile accounts can switch between Employee and Manager beside VOXEL1. Eligibility is enforced by the database, and mobile login continues to work in either mode.' },
+    ],
+  },
+  {
     date: '2026-10-08',
     title: 'Project dropdown',
     entries: [

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import ManagerApp from '../ManagerApp';
+vi.mock('../../services/supabase', async (original) => { const actual = await original<typeof import('../../services/supabase')>(); return { ...actual, supabase: { ...actual.supabase, rpc: vi.fn(async () => ({ data: false, error: null })) } }; });
 import { assignedTaskService } from '../../services/assignedTask.service';
 import { hrService } from '../../services/hrService';
 import { calendarService } from '../../services/calendar.service';

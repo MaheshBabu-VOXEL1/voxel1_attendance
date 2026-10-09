@@ -10,6 +10,7 @@ import { ymd } from '../utils/attendanceSheet';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import './EmployeeDay.css';
+import AccountModeSwitch from '../components/AccountModeSwitch';
 
 const date = (s: string) => new Date(`${s}T12:00:00`);
 const short = (s: string) => date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -126,7 +127,7 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
   const upcoming = leaves.filter(l => l.endDate >= today).sort((a,b) => a.startDate.localeCompare(b.startDate));
 
   return <div className="employee-day" data-theme={darkMode ? 'dark' : 'light'}>
-    <header className="appbar"><div className="appbar-in"><a className="lockup" href="#/dashboard" aria-label="Voxel1 home"><img src="/img/employee-day-mark.png" alt="" /><span className="wm"><b>VOXEL1</b></span></a><span className="chip-date chip-name" title={user.name || undefined}>{user.name || date(today).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })}</span></div></header>
+    <header className="appbar"><div className="appbar-in"><div className="account-brand"><a className="lockup" href="#/dashboard" aria-label="Voxel1 home"><img src="/img/employee-day-mark.png" alt="" /><span className="wm"><b>VOXEL1</b></span></a><AccountModeSwitch user={user} /></div><span className="chip-date chip-name" title={user.name || undefined}>{user.name || date(today).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })}</span></div></header>
     <main className="wrap">
       <section className="hero" aria-labelledby="dayTitle"><h1 id="dayTitle">{date(today).toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' })}</h1>
         <div className="att"><div className="att-l"><span className={`dot${active ? '' : ' off'}`} /><div><b>{!ready ? 'Loading attendance…' : active ? 'Checked in' : attendance?.checkOut ? 'Checked out' : 'Not checked in'}</b><span>{punchTime ? `at ${punchTime}` : 'Start your day'}</span></div></div><button className={`btn att-btn ${active ? 'leave-btn' : 'in'}`} disabled={!ready || !canWrite} onClick={() => onNavigate(active ? 'attendance-finish' : 'attendance-quick-office')}>{active ? 'Check out' : 'Check in'}</button></div>
