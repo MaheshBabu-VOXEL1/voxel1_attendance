@@ -178,6 +178,28 @@ describe('manager app', () => {
     await waitFor(() => expect(hrService.updateLeaveStatus).toHaveBeenCalledWith('l1', 'APPROVED', '', 'MANAGER'));
   });
 
+  it('lets an account-switch member in Manager mode decide other people\'s leave but not their own', async () => {
+    vi.mocked(hrService.getLeaves).mockResolvedValue([
+      { id: 'l1', employeeId: 'e1', employeeName: 'Divya Kallepalli', lineManagerId: 'mgr', startDate: today, endDate: today, totalDays: 1, type: 'CASUAL_SICK', reason: 'Fever', status: 'PENDING_MANAGER', appliedDate: today },
+      { id: 'l2', employeeId: 'e3', employeeName: 'Maruthi', lineManagerId: 'mgr', startDate: today, endDate: today, totalDays: 1, type: 'CASUAL_SICK', reason: 'Trip', status: 'PENDING_MANAGER', appliedDate: today },
+    ] as any);
+    render(<ManagerApp user={{ id: 'e3', name: 'Maruthi', role: 'MANAGER' } as any} />);
+    fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
+    expect(await screen.findByText('Divya Kallepalli', { selector: 'b' })).toBeInTheDocument();
+    expect(screen.queryByText('Maruthi', { selector: 'b' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(hrService.updateLeaveStatus).toHaveBeenCalledWith('l1', 'APPROVED', '', 'MANAGER'));
+  });
+
+  it('does not show other managers\' leave queues to a manager who is not a switch member', async () => {
+    vi.mocked(hrService.getLeaves).mockResolvedValue([
+      { id: 'l1', employeeId: 'e1', employeeName: 'Divya Kallepalli', lineManagerId: 'someone-else', startDate: today, endDate: today, totalDays: 1, type: 'CASUAL_SICK', reason: 'Fever', status: 'PENDING_MANAGER', appliedDate: today },
+    ] as any);
+    render(<ManagerApp user={user} />);
+    fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
+    expect(await screen.findByText('All caught up')).toBeInTheDocument();
+  });
+
   it('shows the calendar inside Attendance and adds an event from the month header', async () => {
     render(<ManagerApp user={user} />);
     fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));

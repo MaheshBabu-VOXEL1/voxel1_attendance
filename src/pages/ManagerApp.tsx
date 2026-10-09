@@ -80,6 +80,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [route, setRoute] = useState<Route>('tasks');
   const { tasks: allTasks, loading: tasksLoading, error: tasksError, refresh } = useAssignedTasks();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  // An account-switch member in Manager mode also decides other people's leave.
+  const [coDecider, setCoDecider] = useState(false);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<CustomLeaveType[]>(DEFAULT_LEAVE_TYPES);
   const [balances, setBalances] = useState<Record<string, LeaveBalance>>({});
@@ -126,6 +128,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       if (!alive) return;
       // Account-switch members stay assignable while they are in Manager mode.
       const sw = new Set(switchers);
+      setCoDecider(sw.has(user.id));
       setEmployees(emps.filter(e => (e.role === 'EMPLOYEE' || sw.has(e.id)) && e.status !== 'INACTIVE').sort((a, b) => (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' })));
       setLeaveTypes(types);
       if (cfg?.workingDays?.length) setWorkingDays(cfg.workingDays);
@@ -294,7 +297,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const dueBar = (anchor: HTMLElement, cur: string | null, pick: (v: string) => void) => openPop({ anchor, kind: 'due', cur, pick });
 
   // ---------- render ----------
-  const pendingLeaves = leaves.filter(l => l.status === 'PENDING_MANAGER' && (l.lineManagerId === user.id || user.role === 'ADMIN'))
+  const pendingLeaves = leaves.filter(l => l.status === 'PENDING_MANAGER' && (l.lineManagerId === user.id || user.role === 'ADMIN' || (coDecider && l.employeeId !== user.id)))
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   return <div className="mgr" data-theme={darkMode ? 'dark' : 'light'}>

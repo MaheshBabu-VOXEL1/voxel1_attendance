@@ -18,6 +18,7 @@ export const changelog: ChangelogRelease[] = [
     date: '2026-10-09',
     title: 'Employee and manager account switch',
     entries: [
+      { type: 'feature', description: 'The six account-switch members can approve or reject leave while in Manager mode, for anyone except themselves (migration 0077: is_leave_co_decider, leaves_update policy, guard_leave_update, enforce_leave_decider). Their Leaves tab lists every pending request except their own.' },
       { type: 'breaking', description: 'The login page has only the mobile-number login; the Employee/Manager choice and email + password login are gone. Kesari (7700901979) becomes the Manager and logs in by mobile (migration 0076); the placeholder Test Manager account is deactivated and its employees and pending leave requests move to Kesari. The employee-mobile-login function now accepts any Manager and refuses only Admins, so it no longer keeps its own list of switch members. sole_manager ignores deactivated accounts and members in Manager mode.' },
       { type: 'feature', description: 'Ahmad Ali (9795611931) is the sixth account-switch member: migration 0075 adds the number to is_mode_switcher, and the employee-mobile-login function lets the number log in while in Manager mode.' },
       { type: 'feature', description: 'The five account-switch members can be assigned tasks in either mode. They stay in the Assign list while in Manager mode, and migration 0074 lets assign, assign-from-backlog and task edits accept them (the mobile list now lives in one is_mode_switcher function).' },
