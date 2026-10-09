@@ -153,6 +153,16 @@ describe('manager app', () => {
     expect(await dotFor(/Maruthi/)).toContain('grey');
   });
 
+  it('opens the calendar on the first tap of the calendar button', async () => {
+    const showPicker = vi.fn();
+    (HTMLInputElement.prototype as any).showPicker = showPicker;
+    try {
+      render(<ManagerApp user={user} />);
+      fireEvent.click(screen.getAllByLabelText('Pick a due date')[0]);
+      expect(showPicker).toHaveBeenCalledTimes(1);
+    } finally { delete (HTMLInputElement.prototype as any).showPicker; }
+  });
+
   it('keeps the New project box open when the phone keyboard opens (page resize and scroll)', async () => {
     render(<ManagerApp user={user} />);
     await waitFor(() => expect(assignedTaskService.listProjects).toHaveBeenCalled());

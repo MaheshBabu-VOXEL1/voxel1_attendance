@@ -18,6 +18,7 @@ export const changelog: ChangelogRelease[] = [
     date: '2026-10-09',
     title: 'Employee and manager account switch',
     entries: [
+      { type: 'fix', description: 'The calendar button in the add-task form (and the day picker on Attendance) opens on the first tap. It is an invisible date field over the icon, and Chrome only opened its picker when its own small icon was hit; tapping now calls showPicker().' },
       { type: 'fix', description: 'On phones, "+ New project" closed or jumped as soon as it opened: focusing the name box opened the keyboard, which resized and scrolled the page, and every popover closed on resize/scroll. The New project box now stays open, moves to stay above the keyboard (visualViewport), and focuses without scrolling the page. Pick lists still close on scroll.' },
       { type: 'improvement', description: 'Manager-board dots follow the new colour rule: ARC blue, MEP green, everyone else grey (no more red for IT, and switch members keep their discipline colour). A new profiles.dot_colour (migration 0080) overrides it per person; Srikanth Gunda is set to grey.' },
       { type: 'feature', description: 'Uday (8978612058) is the seventh account-switch member (migration 0079 adds the number to is_mode_switcher).' },

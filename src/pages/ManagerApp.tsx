@@ -173,6 +173,13 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const popRef = useRef<HTMLDivElement>(null);
   const [popPos, setPopPos] = useState<{ top: number; left: number } | null>(null);
   const openPop = (p: Pop) => { setPop(cur => (cur && cur.anchor === p.anchor ? null : p)); setPopPos(null); };
+  // The date field is invisible over the calendar icon. Chrome only opens its picker when its own small
+  // icon is hit, so most taps missed; open the picker on any tap instead.
+  const openDatePicker = (e: React.MouseEvent<HTMLInputElement>) => {
+    const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
+    if (typeof el.showPicker === 'function') { try { e.preventDefault(); el.showPicker(); } catch { /* the browser opens it itself */ } }
+  };
+
   // Focus a field when it appears without scrolling the page (which would move or close the popover).
   const focusNoScroll = useCallback((el: HTMLInputElement | null) => { el?.focus({ preventScroll: true }); }, []);
   const placePop = useCallback((p: Pop) => {
@@ -386,7 +393,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     return <div className="dseg" role="group" aria-label="Due date">
       {opts.map(([l, v]) => <button key={l} type="button" aria-pressed={cur === v} onClick={() => onPick(cur === v ? '' : v)}>{l}</button>)}
       <label aria-pressed={custom} title="Pick a date">{custom ? short(cur!) : I.cal}
-        <input type="date" aria-label="Pick a due date" value={cur || ''} onChange={e => e.target.value && onPick(e.target.value)} /></label>
+        <input type="date" aria-label="Pick a due date" value={cur || ''} onChange={e => e.target.value && onPick(e.target.value)}
+          onClick={openDatePicker} /></label>
       {clearable && <button type="button" className="x" aria-label="Remove due date" onClick={() => onPick('')}>{I.cross}</button>}
     </div>;
   }
@@ -730,7 +738,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       <div className="n"><button className="ibtn" aria-label="Previous day" onClick={() => shift(-1)}>{I.l}</button>
         {d !== T0 && <button className="btn ghost" style={{ height: 36, padding: '0 8px' }} onClick={() => setAttDate(T0)}>Today</button>}
         <label className="ibtn" style={{ position: 'relative', cursor: 'pointer' }} aria-label="Pick a date">{I.cal}
-          <input type="date" value={d} max={T0} onChange={e => e.target.value && setAttDate(e.target.value > T0 ? T0 : e.target.value)} style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }} /></label>
+          <input type="date" value={d} max={T0} onChange={e => e.target.value && setAttDate(e.target.value > T0 ? T0 : e.target.value)} onClick={openDatePicker} style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }} /></label>
         <button className="ibtn" aria-label="Next day" disabled={d >= T0} style={d >= T0 ? { opacity: 0.3 } : undefined} onClick={() => shift(1)}>{I.r}</button></div></div>;
     if (!isWk(dt) || hol) return <>{head}{nav}<div className="card empty" style={{ marginTop: 12 }}>{hol ? `${hol.name} · company holiday` : 'Weekend'}. No attendance recorded.</div></>;
     const all = employees.map(e => ({ e, a: attOf(e.id, d, dayRows) }));
