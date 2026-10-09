@@ -195,12 +195,18 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   useEffect(() => {
     if (!pop) return;
     const down = (e: PointerEvent) => { if (popRef.current && !popRef.current.contains(e.target as Node) && !pop.anchor.contains(e.target as Node)) setPop(null); };
-    // A box you type in stays open when the keyboard opens (which resizes and scrolls the page); it only moves.
-    const typing = pop.kind === 'newproj';
-    const onMove = () => { if (typing) placePop(pop); else setPop(null); };
+    // On phones the page resizes and scrolls by itself: the address bar slides in and out, and the keyboard
+    // opens for a box you type in. Follow the page instead of closing; close only when the button the
+    // popover belongs to scrolls out of sight, or the screen width changes (the phone was rotated).
+    const typing = pop.kind === 'newproj', w0 = window.innerWidth;
+    const onMove = () => {
+      const r = pop.anchor.getBoundingClientRect();
+      if (!typing && (window.innerWidth !== w0 || r.bottom < 0 || r.top > window.innerHeight)) { setPop(null); return; }
+      placePop(pop);
+    };
     const vv = window.visualViewport;
     document.addEventListener('pointerdown', down, true); window.addEventListener('scroll', onMove, { passive: true }); window.addEventListener('resize', onMove);
-    if (typing) vv?.addEventListener('resize', onMove);
+    vv?.addEventListener('resize', onMove);
     return () => {
       document.removeEventListener('pointerdown', down, true); window.removeEventListener('scroll', onMove); window.removeEventListener('resize', onMove);
       vv?.removeEventListener('resize', onMove);
@@ -209,6 +215,15 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
 
   // ---------- sheet ----------
   const [sheet, setSheet] = useState<null | { kind: 'task'; id: string } | { kind: 'event' } | { kind: 'account' } | { kind: 'person'; id: string }>(null);
+  // A phone keyboard covers the bottom of the screen without moving fixed elements; lift the sheet above it.
+  const [kbLift, setKbLift] = useState(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!sheet || !vv) { setKbLift(0); return; }
+    const fit = () => setKbLift(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
+    fit(); vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit);
+    return () => { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); };
+  }, [sheet]);
   // Per-screen state lives here (not inside the screen functions) so it survives re-renders.
   const [cpP, setCpP] = useState('');
   const [savedProjects, setSavedProjects] = useState<TaskProject[]>([]);
@@ -376,7 +391,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     </div>}
 
     <div className={`scrim${sheet ? ' show' : ''}`} onClick={() => setSheet(null)} />
-    <div className={`sheet${sheet ? ' show' : ''}`} role="dialog" aria-modal="true" aria-labelledby="sheetT" aria-hidden={!sheet}>
+    <div className={`sheet${sheet ? ' show' : ''}`} role="dialog" aria-modal="true" aria-labelledby="sheetT" aria-hidden={!sheet}
+      style={kbLift ? { bottom: kbLift, maxHeight: `calc(100% - ${kbLift + 12}px)` } : undefined}>
       {sheet?.kind === 'task' && TaskSheet(sheet.id)}
       {sheet?.kind === 'event' && EventSheet()}
       {sheet?.kind === 'account' && AccountSheet()}

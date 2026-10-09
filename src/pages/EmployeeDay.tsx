@@ -44,6 +44,15 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
   const [note, setNote] = useState('');
   const [formError, setFormError] = useState('');
   const sheet = useRef<HTMLDialogElement>(null);
+  // A phone keyboard covers the bottom of the screen without moving fixed elements; lift the leave form above it.
+  const [kbLift, setKbLift] = useState(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!open || !vv) { setKbLift(0); return; }
+    const fit = () => setKbLift(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
+    fit(); vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit);
+    return () => { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); };
+  }, [open]);
   const apply = useRef<HTMLButtonElement>(null);
   const today = ymd(new Date());
   const tomorrowDate = date(today); tomorrowDate.setDate(tomorrowDate.getDate() + 1);
@@ -144,7 +153,7 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
       })}</div>
       {!query.trim() && tasks.some(old) && <button className={`more${history ? ' open' : ''}`} aria-expanded={history} onClick={() => setHistory(!history)}>{history ? 'Hide finished tasks' : `Show more (${tasks.filter(old).length} finished earlier)`}<ChevronDown size={16}/></button>}
     </main>
-    {open && <dialog ref={sheet} className="sheet show" aria-labelledby="sheetTitle" onCancel={e => { e.preventDefault(); if (busy !== 'leave') close(); }} onClick={e => { if (e.target === e.currentTarget && busy !== 'leave') { const r=e.currentTarget.getBoundingClientRect(); if(e.clientY < r.top || e.clientX < r.left || e.clientX > r.right) close(); } }}><div className="grab"/><div className="sheet-h"><h2 id="sheetTitle">Apply leave</h2><button className="x" aria-label="Close" disabled={busy === 'leave'} onClick={close}><X size={18}/></button></div>
+    {open && <dialog ref={sheet} className="sheet show" aria-labelledby="sheetTitle" style={kbLift ? { bottom: kbLift, maxHeight: `calc(100% - ${kbLift + 12}px)` } : undefined} onCancel={e => { e.preventDefault(); if (busy !== 'leave') close(); }} onClick={e => { if (e.target === e.currentTarget && busy !== 'leave') { const r=e.currentTarget.getBoundingClientRect(); if(e.clientY < r.top || e.clientX < r.left || e.clientX > r.right) close(); } }}><div className="grab"/><div className="sheet-h"><h2 id="sheetTitle">Apply leave</h2><button className="x" aria-label="Close" disabled={busy === 'leave'} onClick={close}><X size={18}/></button></div>
       <div className="fl"><span className="lab">Type</span><div className={`opts c${Math.min(Math.max(TYPES.length, 1), 3)}`}>{TYPES.map(t => <button key={t} className="opt" aria-pressed={type===t} onClick={() => setType(t)}><b>{label(t)}</b><span>{Number(balance?.[t] || 0)} left</span></button>)}</div></div>
       <div className="fl"><span className="lab">When</span><div className="opts c3">{['today','tomorrow','pick'].map(w => <button key={w} className="opt" aria-pressed={when===w} onClick={() => {setWhen(w); setHalf(false);}}><b>{w==='pick' ? 'Pick dates' : w==='today' ? 'Today' : 'Tomorrow'}</b><span>{w==='pick' ? 'From – to' : short(w==='today' ? today : tomorrow)}</span></button>)}</div>
       {when === 'pick' && <div className="dates show"><div className="field"><label htmlFor="leave-from">From</label><input id="leave-from" type="date" min={today} value={from} onChange={e => {setFrom(e.target.value);setHalf(false);}}/></div><div className="field"><label htmlFor="leave-to">To</label><input id="leave-to" type="date" min={from || today} value={to} onChange={e => {setTo(e.target.value);setHalf(false);}}/></div></div>}

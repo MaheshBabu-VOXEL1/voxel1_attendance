@@ -178,14 +178,33 @@ describe('manager app', () => {
     await waitFor(() => expect(assignedTaskService.createProject).toHaveBeenCalledWith('Hamad Port'));
   });
 
-  it('still closes a pick list when the page scrolls', async () => {
+  it('keeps a pick list open while the page only scrolls a little or the address bar resizes it', async () => {
     render(<ManagerApp user={user} />);
     await waitFor(() => expect(assignedTaskService.listProjects).toHaveBeenCalled());
     await act(async () => {});
     fireEvent.click(screen.getByRole('button', { name: /^Project:/ }));
     expect(await screen.findByRole('option', { name: /KAFD/ })).toBeInTheDocument();
+    act(() => { window.dispatchEvent(new Event('scroll')); window.dispatchEvent(new Event('resize')); });
+    expect(screen.getByRole('option', { name: /KAFD/ })).toBeInTheDocument();
+  });
+
+  it('closes a pick list when its button scrolls out of view or the phone is rotated', async () => {
+    render(<ManagerApp user={user} />);
+    await waitFor(() => expect(assignedTaskService.listProjects).toHaveBeenCalled());
+    await act(async () => {});
+    const btn = screen.getByRole('button', { name: /^Project:/ });
+    fireEvent.click(btn);
+    expect(await screen.findByRole('option', { name: /KAFD/ })).toBeInTheDocument();
+    const rect = vi.spyOn(btn, 'getBoundingClientRect').mockReturnValue({ top: -200, bottom: -150, left: 0, right: 100, width: 100, height: 50, x: 0, y: -200, toJSON: () => ({}) } as DOMRect);
     act(() => { window.dispatchEvent(new Event('scroll')); });
     expect(screen.queryByRole('option', { name: /KAFD/ })).not.toBeInTheDocument();
+    rect.mockRestore();
+    fireEvent.click(btn);
+    expect(await screen.findByRole('option', { name: /KAFD/ })).toBeInTheDocument();
+    const w = window.innerWidth;
+    act(() => { (window as any).innerWidth = w + 200; window.dispatchEvent(new Event('resize')); });
+    expect(screen.queryByRole('option', { name: /KAFD/ })).not.toBeInTheDocument();
+    (window as any).innerWidth = w;
   });
 
   it('picks a saved project from the dropdown and creates a new one with + New project', async () => {
