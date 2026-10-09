@@ -248,6 +248,9 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     } catch (e) { fail(e); } finally { setNewProjBusy(false); }
   };
   const canEdit = (t: AssignedTask) => !t.self_created && t.assigned_by === user.id;
+  const taskAttribution = (t: AssignedTask) => t.self_created
+    ? `Written by ${t.employee_name || empName(t.employee_id || '') || 'Employee'}`
+    : `Assigned by ${t.manager_name || (t.assigned_by === user.id ? user.name : 'Manager')} → ${t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Unassigned'}`;
   const task = (id: string) => tasks.find(t => t.id === id);
 
   const update = async (t: AssignedTask, ch: Partial<{ who: string | null; due: string | null; s: TaskStatus; p: string; text: string }>, quiet = false) => {
@@ -353,7 +356,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
 
   function TasksView() {
     const inF = (t: AssignedTask) => (pfilter === 'all' || t.project_name === pfilter)
-      && (!q || `${t.description} ${t.project_name || ''} ${t.employee_name || ''}`.toLowerCase().includes(q.toLowerCase()));
+      && (!q || `${t.description} ${t.project_name || ''} ${t.employee_name || ''} ${t.manager_name || ''}`.toLowerCase().includes(q.toLowerCase()));
     const open = tasks.filter(t => t.status !== 'END' && inF(t));
     const done = tasks.filter(t => t.status === 'END' && inF(t));
     const over = open.filter(t => t.due_date && t.due_date < T0).length, stuck = open.filter(t => t.status === 'STUCK').length;
@@ -481,6 +484,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
           onClick={e => { if (!swiped()) menuStatus(e.currentTarget, t.status, v => void update(t, { s: v as TaskStatus })); }}>{SIC[t.status]}</button>
         <div className="tc">
           <button className="tt" onClick={() => { if (!swiped()) openTask(t.id); }}>{t.description}</button>
+          <p className="task-attribution">{taskAttribution(t)}</p>
           <div className="mt">{bits.map((b, i) => <React.Fragment key={i}>{i > 0 && <span className="sep" aria-hidden="true">·</span>}{b}</React.Fragment>)}</div>
         </div>
       </div>
@@ -496,6 +500,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     const saveText = () => { const v = text.replace(/\n/g, ' ').trim(); if (v && v !== t.description) void update(t, { text: v }, true); };
     return <>
       <div className="grab" /><div className="sh"><h2 id="sheetT">Task</h2><button className="ibtn" aria-label="Close" onClick={() => { saveText(); setSheet(null); }}>{I.x}</button></div>
+      <p className="task-attribution">{taskAttribution(t)}</p>
       <label className="vh" htmlFor="eT">Task</label>
       <textarea ref={fit} className="ttl-in" id="eT" rows={2} value={text} readOnly={!edit} maxLength={4000}
         onChange={e => setText(e.target.value)} onBlur={saveText} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }} />

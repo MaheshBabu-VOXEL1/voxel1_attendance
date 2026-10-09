@@ -103,6 +103,7 @@ main{max-width:720px;margin:0 auto;padding:16px 16px calc(92px + env(safe-area-i
 .sic.ns{color:var(--faint)} .sic.sd,.sic.ip{color:var(--steel)} .sic.sk{color:var(--stop)} .sic.dn{color:var(--go)}
 
 /* ---- tasks ---- */
+.task-attribution{margin:4px 0;color:var(--muted);font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 .comp{padding:6px}
 .c1{display:flex;align-items:center;gap:6px}
 .pj{flex:none;max-width:120px;height:40px;padding:0 9px 0 12px;border-radius:10px;background:var(--tint);color:var(--steel);font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:5px}

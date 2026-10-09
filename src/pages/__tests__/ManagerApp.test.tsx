@@ -9,8 +9,8 @@ import { ymd } from '../../utils/attendanceSheet';
 
 const today = ymd(new Date());
 const tasks = [
-  { id: 't1', employee_id: 'e1', employee_name: 'Divya Kallepalli', assigned_by: 'mgr', description: 'Review shaft sizes', project_name: 'Vyoma', project_number: 1, due_date: today, status: 'PROGRESS', self_created: false, created: '2026-10-08T05:00:00Z' },
-  { id: 't2', employee_id: null, employee_name: null, assigned_by: 'mgr', description: 'Door schedule update', project_name: 'Vyoma', status: 'NOT_STARTED', self_created: false, created: '2026-10-08T04:00:00Z' },
+  { id: 't1', employee_id: 'e1', employee_name: 'Divya Kallepalli', assigned_by: 'mgr', manager_name: 'Maruthi', description: 'Review shaft sizes', project_name: 'Vyoma', project_number: 1, due_date: today, status: 'PROGRESS', self_created: false, created: '2026-10-08T05:00:00Z' },
+  { id: 't2', employee_id: null, employee_name: null, assigned_by: 'other-manager', manager_name: 'Main Manager', description: 'Door schedule update', project_name: 'Vyoma', status: 'NOT_STARTED', self_created: false, created: '2026-10-08T04:00:00Z' },
   { id: 't3', employee_id: 'e2', employee_name: 'Ravi', assigned_by: 'mgr', description: 'Own note', project_name: null, status: 'START', self_created: true, created: '2026-10-08T03:00:00Z' },
 ];
 vi.mock('../../hooks/useAssignedTasks', () => ({ useAssignedTasks: () => ({ tasks, loading: false, error: '', refresh: vi.fn(async () => {}) }) }));
@@ -44,6 +44,24 @@ const user = { id: 'mgr', name: 'Test Manager', role: 'MANAGER', email: 'tm@exam
 
 describe('manager app', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('shows the actual assigner and recipient across the shared manager board', async () => {
+    render(<ManagerApp user={user} />);
+    expect(screen.getByText('Assigned by Maruthi → Divya Kallepalli')).toBeInTheDocument();
+    expect(screen.getByText('Assigned by Main Manager → Unassigned')).toBeInTheDocument();
+    expect(screen.getByText('Written by Ravi')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Door schedule update' }));
+    expect(screen.getAllByText('Assigned by Main Manager → Unassigned')).toHaveLength(2);
+    expect(screen.getByText('Created by another manager. Only they can change it.')).toBeInTheDocument();
+  });
+
+  it('finds shared tasks by the assigner name', async () => {
+    render(<ManagerApp user={user} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Search tasks' }));
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search tasks' }), { target: { value: 'Maruthi' } });
+    expect(screen.getByText('Review shaft sizes')).toBeInTheDocument();
+    expect(screen.queryByText('Door schedule update')).not.toBeInTheDocument();
+  });
 
   it('shows the Tasks, Leaves and Attendance tabs, open tasks grouped by date, and the pending-leave badge', async () => {
     render(<ManagerApp user={user} />);

@@ -58,7 +58,7 @@ export const assignedTaskService = {
     if (error) throw new Error(error.message);
     return data;
   },
-  /** Save a task with no person yet; only the manager who created it can see it until it is assigned. */
+  /** Save a task with no person yet; it appears on the organization's shared manager board. */
   async createUnassigned(description: string, projectName: string, dueDate: string): Promise<AssignedTask> {
     if (!projectName.trim()) throw new Error('Choose or add a project.');
     const { data, error } = await supabase.rpc('create_unassigned_task', { p_description: description.trim(), p_project_name: projectName.trim(), p_due_date: dueDate || null });
