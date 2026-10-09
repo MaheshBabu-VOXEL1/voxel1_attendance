@@ -153,6 +153,31 @@ describe('manager app', () => {
     expect(await dotFor(/Maruthi/)).toContain('grey');
   });
 
+  it('keeps the New project box open when the phone keyboard opens (page resize and scroll)', async () => {
+    render(<ManagerApp user={user} />);
+    await waitFor(() => expect(assignedTaskService.listProjects).toHaveBeenCalled());
+    await act(async () => {});
+    fireEvent.click(screen.getByRole('button', { name: /^Project:/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /New project/ }));
+    const name = await screen.findByLabelText('Project name');
+    expect(name).toHaveFocus();
+    act(() => { window.dispatchEvent(new Event('resize')); window.dispatchEvent(new Event('scroll')); });
+    expect(screen.getByLabelText('Project name')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Project name'), { target: { value: 'Hamad Port' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(assignedTaskService.createProject).toHaveBeenCalledWith('Hamad Port'));
+  });
+
+  it('still closes a pick list when the page scrolls', async () => {
+    render(<ManagerApp user={user} />);
+    await waitFor(() => expect(assignedTaskService.listProjects).toHaveBeenCalled());
+    await act(async () => {});
+    fireEvent.click(screen.getByRole('button', { name: /^Project:/ }));
+    expect(await screen.findByRole('option', { name: /KAFD/ })).toBeInTheDocument();
+    act(() => { window.dispatchEvent(new Event('scroll')); });
+    expect(screen.queryByRole('option', { name: /KAFD/ })).not.toBeInTheDocument();
+  });
+
   it('picks a saved project from the dropdown and creates a new one with + New project', async () => {
     render(<ManagerApp user={user} />);
     await waitFor(() => expect(assignedTaskService.listProjects).toHaveBeenCalled());

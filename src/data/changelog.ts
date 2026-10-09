@@ -18,6 +18,7 @@ export const changelog: ChangelogRelease[] = [
     date: '2026-10-09',
     title: 'Employee and manager account switch',
     entries: [
+      { type: 'fix', description: 'On phones, "+ New project" closed or jumped as soon as it opened: focusing the name box opened the keyboard, which resized and scrolled the page, and every popover closed on resize/scroll. The New project box now stays open, moves to stay above the keyboard (visualViewport), and focuses without scrolling the page. Pick lists still close on scroll.' },
       { type: 'improvement', description: 'Manager-board dots follow the new colour rule: ARC blue, MEP green, everyone else grey (no more red for IT, and switch members keep their discipline colour). A new profiles.dot_colour (migration 0080) overrides it per person; Srikanth Gunda is set to grey.' },
       { type: 'feature', description: 'Uday (8978612058) is the seventh account-switch member (migration 0079 adds the number to is_mode_switcher).' },
       { type: 'fix', description: 'The grey discipline dot used the class name "mgr", which is also the Manager screen root, so grey dots stretched into a tall grey bar down the Assign list. Renamed to "grey".' },

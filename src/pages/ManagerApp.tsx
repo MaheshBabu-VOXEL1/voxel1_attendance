@@ -173,19 +173,32 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const popRef = useRef<HTMLDivElement>(null);
   const [popPos, setPopPos] = useState<{ top: number; left: number } | null>(null);
   const openPop = (p: Pop) => { setPop(cur => (cur && cur.anchor === p.anchor ? null : p)); setPopPos(null); };
-  useEffect(() => {
-    if (!pop || !popRef.current) return;
-    const r = pop.anchor.getBoundingClientRect(), el = popRef.current, w = el.offsetWidth, h = el.offsetHeight;
+  // Focus a field when it appears without scrolling the page (which would move or close the popover).
+  const focusNoScroll = useCallback((el: HTMLInputElement | null) => { el?.focus({ preventScroll: true }); }, []);
+  const placePop = useCallback((p: Pop) => {
+    const el = popRef.current; if (!el) return;
+    const r = p.anchor.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
+    // The visible area shrinks when a phone keyboard opens; keep the popover inside it.
+    const vv = window.visualViewport, vTop = vv?.offsetTop ?? 0, vH = vv?.height ?? window.innerHeight;
     let top = r.bottom + 6; if (top + h > window.innerHeight - 72 && r.top - h - 6 > 8) top = r.top - h - 6;
+    if (p.kind === 'newproj') top = Math.min(Math.max(top, vTop + 8), vTop + vH - h - 8);
     setPopPos({ top: Math.max(8, top), left: Math.min(Math.max(12, r.left), window.innerWidth - w - 12) });
-  }, [pop]);
+  }, []);
+  useEffect(() => { if (pop) placePop(pop); }, [pop, placePop]);
   useEffect(() => {
     if (!pop) return;
     const down = (e: PointerEvent) => { if (popRef.current && !popRef.current.contains(e.target as Node) && !pop.anchor.contains(e.target as Node)) setPop(null); };
-    const close = () => setPop(null);
-    document.addEventListener('pointerdown', down, true); window.addEventListener('scroll', close, { passive: true }); window.addEventListener('resize', close);
-    return () => { document.removeEventListener('pointerdown', down, true); window.removeEventListener('scroll', close); window.removeEventListener('resize', close); };
-  }, [pop]);
+    // A box you type in stays open when the keyboard opens (which resizes and scrolls the page); it only moves.
+    const typing = pop.kind === 'newproj';
+    const onMove = () => { if (typing) placePop(pop); else setPop(null); };
+    const vv = window.visualViewport;
+    document.addEventListener('pointerdown', down, true); window.addEventListener('scroll', onMove, { passive: true }); window.addEventListener('resize', onMove);
+    if (typing) vv?.addEventListener('resize', onMove);
+    return () => {
+      document.removeEventListener('pointerdown', down, true); window.removeEventListener('scroll', onMove); window.removeEventListener('resize', onMove);
+      vv?.removeEventListener('resize', onMove);
+    };
+  }, [pop, placePop]);
 
   // ---------- sheet ----------
   const [sheet, setSheet] = useState<null | { kind: 'task'; id: string } | { kind: 'event' } | { kind: 'account' } | { kind: 'person'; id: string }>(null);
@@ -349,7 +362,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       </> : pop.kind === 'newproj' ? <form className="np" onSubmit={e => { e.preventDefault(); void createProject(pop.pick); }}>
         <div className="phd">New project</div>
         <label className="vh" htmlFor="npName">Project name</label>
-        <input id="npName" className="inp" placeholder="Project name" maxLength={200} autoFocus autoComplete="off" value={newProjName} onChange={e => setNewProjName(e.target.value)} />
+        <input id="npName" ref={focusNoScroll} className="inp" placeholder="Project name" maxLength={200} autoComplete="off" enterKeyHint="done" value={newProjName} onChange={e => setNewProjName(e.target.value)} />
         <div className="np-a"><button type="button" className="btn" onClick={() => setPop(null)}>Cancel</button>
           <button type="submit" className="btn pri" disabled={!newProjName.trim() || newProjBusy}>{newProjBusy ? 'Creating…' : 'Create'}</button></div>
       </form> : DueSeg(pop.cur ?? null, v => { const p = pop.pick; setPop(null); p(v); }, !!pop.cur)}
