@@ -268,6 +268,17 @@ describe('manager app', () => {
     await waitFor(() => expect(hrService.updateLeaveStatus).toHaveBeenCalledWith('l1', 'APPROVED', '', 'MANAGER'));
   });
 
+  it('shows the manager their own leave when they are their own line manager (Kesari)', async () => {
+    vi.mocked(hrService.getLeaves).mockResolvedValue([
+      { id: 'l9', employeeId: 'mgr', employeeName: 'Test Manager', lineManagerId: 'mgr', startDate: today, endDate: today, totalDays: 1, type: 'CASUAL_SICK', reason: 'Personal', status: 'PENDING_MANAGER', appliedDate: today },
+    ] as any);
+    render(<ManagerApp user={user} />);
+    fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
+    expect(await screen.findByText('Test Manager', { selector: 'b' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(hrService.updateLeaveStatus).toHaveBeenCalledWith('l9', 'APPROVED', '', 'MANAGER'));
+  });
+
   it('does not show other managers\' leave queues to a manager who is not a switch member', async () => {
     vi.mocked(hrService.getLeaves).mockResolvedValue([
       { id: 'l1', employeeId: 'e1', employeeName: 'Divya Kallepalli', lineManagerId: 'someone-else', startDate: today, endDate: today, totalDays: 1, type: 'CASUAL_SICK', reason: 'Fever', status: 'PENDING_MANAGER', appliedDate: today },
