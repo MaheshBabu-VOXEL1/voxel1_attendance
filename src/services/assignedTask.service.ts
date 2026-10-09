@@ -27,6 +27,12 @@ export const statusLabel: Record<TaskStatus, string> = {
 };
 export interface TaskProject { id: string; name: string; project_number: number }
 export const assignedTaskService = {
+  /** Account-switch members who can be assigned tasks even while in Manager mode. */
+  async listModeSwitcherIds(): Promise<string[]> {
+    const { data, error } = await supabase.rpc('mode_switcher_ids');
+    if (error) throw new Error(error.message);
+    return (data || []) as string[];
+  },
   /** The organization's projects, including ones with no tasks yet (task_projects is read through this function only). */
   async listProjects(): Promise<TaskProject[]> {
     const { data, error } = await supabase.rpc('list_task_projects');

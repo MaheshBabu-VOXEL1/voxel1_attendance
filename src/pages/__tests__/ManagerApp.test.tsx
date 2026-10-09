@@ -19,6 +19,7 @@ vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ logout: vi.fn() 
 vi.mock('../../services/employee.service', () => ({ employeeService: { getEmployees: async () => [
   { id: 'e2', name: 'Ravi', role: 'EMPLOYEE', status: 'ACTIVE' }, { id: 'e1', name: 'Divya Kallepalli', role: 'EMPLOYEE', status: 'ACTIVE' },
   { id: 'mgr', name: 'Test Manager', role: 'MANAGER', status: 'ACTIVE' },
+  { id: 'e3', name: 'Maruthi', role: 'MANAGER', status: 'ACTIVE' },
 ] } }));
 vi.mock('../../services/hrService', () => ({ hrService: {
   getLeaves: vi.fn(async () => [
@@ -37,7 +38,7 @@ vi.mock('../../services/calendar.service', () => ({ calendarService: {
 } }));
 vi.mock('../../services/assignedTask.service', async (orig) => {
   const real = await orig<typeof import('../../services/assignedTask.service')>();
-  return { ...real, assignedTaskService: { listProjects: vi.fn(async () => [{ id: 'p2', name: 'KAFD', project_number: 2 }]), createProject: vi.fn(async (n: string) => ({ id: 'p3', name: n, project_number: 3 })), assign: vi.fn(async () => ({ id: 'n1' })), createUnassigned: vi.fn(async () => ({ id: 'n2' })), managerUpdate: vi.fn(async () => ({})), managerDelete: vi.fn(async () => {}) } };
+  return { ...real, assignedTaskService: { listModeSwitcherIds: vi.fn(async () => ['e3']), listProjects: vi.fn(async () => [{ id: 'p2', name: 'KAFD', project_number: 2 }]), createProject: vi.fn(async (n: string) => ({ id: 'p3', name: n, project_number: 3 })), assign: vi.fn(async () => ({ id: 'n1' })), createUnassigned: vi.fn(async () => ({ id: 'n2' })), managerUpdate: vi.fn(async () => ({})), managerDelete: vi.fn(async () => {}) } };
 });
 
 const user = { id: 'mgr', name: 'Test Manager', role: 'MANAGER', email: 'tm@example.com' } as any;
@@ -104,7 +105,7 @@ describe('manager app', () => {
     expect(rows.find(r => r.textContent!.includes('Ravi'))!.textContent).toContain('Not in yet');
     expect(table.textContent).not.toContain('Test Manager');
     const kpis = document.querySelector('.kpis')!.textContent!;
-    expect(kpis).toContain('1/2Present'); expect(kpis).toContain('1Late'); expect(kpis).toContain('1Not in');
+    expect(kpis).toContain('1/3Present'); expect(kpis).toContain('1Late'); expect(kpis).toContain('2Not in');
     expect(screen.getByText(/Late = checked in after 9:15 am/)).toBeInTheDocument();
     fireEvent.click(divya);
     expect(await screen.findByText(/last 10 working days/)).toBeInTheDocument();
@@ -125,6 +126,16 @@ describe('manager app', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(assignedTaskService.createUnassigned).toHaveBeenCalledWith('Pump room check', 'Vyoma', ''));
     expect(assignedTaskService.assign).not.toHaveBeenCalled();
+  });
+
+  it('lists account-switch members in Manager mode as assignees, but not the manager', async () => {
+    render(<ManagerApp user={user} />);
+    await waitFor(() => expect(assignedTaskService.listModeSwitcherIds).toHaveBeenCalled());
+    await act(async () => {});
+    fireEvent.click(screen.getAllByRole('button', { name: 'Assign' })[0]);
+    expect(await screen.findByRole('option', { name: /Maruthi/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Ravi/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Test Manager/ })).not.toBeInTheDocument();
   });
 
   it('picks a saved project from the dropdown and creates a new one with + New project', async () => {

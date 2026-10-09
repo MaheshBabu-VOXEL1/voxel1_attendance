@@ -121,10 +121,12 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     let alive = true;
     Promise.all([
       employeeService.getEmployees(), hrService.getLeaveTypes().catch(() => DEFAULT_LEAVE_TYPES), hrService.getConfig().catch(() => null),
-      loadLeaves(), loadCalendar(),
-    ]).then(([emps, types, cfg]) => {
+      loadLeaves(), loadCalendar(), assignedTaskService.listModeSwitcherIds().catch(() => [] as string[]),
+    ]).then(([emps, types, cfg, , , switchers]) => {
       if (!alive) return;
-      setEmployees(emps.filter(e => e.role === 'EMPLOYEE' && e.status !== 'INACTIVE').sort((a, b) => (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' })));
+      // Account-switch members stay assignable while they are in Manager mode.
+      const sw = new Set(switchers);
+      setEmployees(emps.filter(e => (e.role === 'EMPLOYEE' || sw.has(e.id)) && e.status !== 'INACTIVE').sort((a, b) => (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' })));
       setLeaveTypes(types);
       if (cfg?.workingDays?.length) setWorkingDays(cfg.workingDays);
       if (cfg?.officeStartTime) setOfficeStart(cfg.officeStartTime);
