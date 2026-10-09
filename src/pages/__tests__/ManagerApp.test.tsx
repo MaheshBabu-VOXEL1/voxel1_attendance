@@ -19,6 +19,7 @@ vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ logout: vi.fn() 
 vi.mock('../../services/employee.service', () => ({ employeeService: { getEmployees: async () => [
   { id: 'e2', name: 'Ravi', role: 'EMPLOYEE', status: 'ACTIVE', department: 'ARC' }, { id: 'e1', name: 'Divya Kallepalli', role: 'EMPLOYEE', status: 'ACTIVE', department: 'MEP' },
   { id: 'e4', name: 'Abhinay', role: 'EMPLOYEE', status: 'ACTIVE', department: 'IT' },
+  { id: 'e5', name: 'Srikanth Gunda', role: 'EMPLOYEE', status: 'ACTIVE', department: 'MEP', dotColour: 'grey' },
   { id: 'mgr', name: 'Test Manager', role: 'MANAGER', status: 'ACTIVE' },
   { id: 'e3', name: 'Maruthi', role: 'MANAGER', status: 'ACTIVE' },
 ] } }));
@@ -106,7 +107,7 @@ describe('manager app', () => {
     expect(rows.find(r => r.textContent!.includes('Ravi'))!.textContent).toContain('Not in yet');
     expect(table.textContent).not.toContain('Test Manager');
     const kpis = document.querySelector('.kpis')!.textContent!;
-    expect(kpis).toContain('1/4Present'); expect(kpis).toContain('1Late'); expect(kpis).toContain('3Not in');
+    expect(kpis).toContain('1/5Present'); expect(kpis).toContain('1Late'); expect(kpis).toContain('4Not in');
     expect(screen.getByText(/Late = checked in after 9:15 am/)).toBeInTheDocument();
     fireEvent.click(divya);
     expect(await screen.findByText(/last 10 working days/)).toBeInTheDocument();
@@ -139,7 +140,7 @@ describe('manager app', () => {
     expect(screen.getByRole('option', { name: /Test Manager \(me\)/ })).toBeInTheDocument();
   });
 
-  it('colours each person by discipline, with managers and switch members grey', async () => {
+  it('colours people ARC blue and MEP green, everyone else grey, unless a colour is chosen', async () => {
     render(<ManagerApp user={user} />);
     await waitFor(() => expect(assignedTaskService.listModeSwitcherIds).toHaveBeenCalled());
     await act(async () => {});
@@ -147,9 +148,9 @@ describe('manager app', () => {
     const dotFor = async (name: RegExp) => (await screen.findByRole('option', { name })).querySelector('.pdot')!.className;
     expect(await dotFor(/Ravi/)).toContain('arc');
     expect(await dotFor(/Divya/)).toContain('mep');
-    expect(await dotFor(/Abhinay/)).toContain('it');
+    expect(await dotFor(/Abhinay/)).toContain('grey');
+    expect(await dotFor(/Srikanth/)).toContain('grey');
     expect(await dotFor(/Maruthi/)).toContain('grey');
-    expect(await dotFor(/Test Manager/)).toContain('grey');
   });
 
   it('picks a saved project from the dropdown and creates a new one with + New project', async () => {

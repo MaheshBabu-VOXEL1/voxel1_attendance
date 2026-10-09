@@ -23,6 +23,7 @@ function mapProfileToEmployee(r: any): Employee {
     email: r.email || r.work_email || '',
     role: (r.role || 'EMPLOYEE').toUpperCase(),
     department: r.department || 'Unassigned',
+    dotColour: r.dot_colour || undefined,
     designation: r.designation || 'Staff',
     avatar: r.avatar ? getSupabaseStorageUrl('avatars', r.avatar) : undefined,
     joiningDate: r.joining_date || '',

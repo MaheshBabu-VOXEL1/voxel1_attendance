@@ -79,6 +79,8 @@ export interface User {
 }
 
 export interface Employee extends User {
+  /** Manager-board dot colour chosen for this person; otherwise it follows the discipline. */
+  dotColour?: 'blue' | 'green' | 'grey';
   joiningDate: string;
   mobile: string;
   emergencyContact: string;

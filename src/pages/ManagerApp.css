@@ -303,11 +303,11 @@ table.att{width:100%;border-collapse:collapse;font-size:13.5px}
 .alert{margin:10px 0;padding:10px 12px;border-radius:10px;background:var(--bad-bg);color:var(--bad);font-size:13px;font-weight:600}
 }
 @keyframes mgr-popin{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-/* Discipline dots: ARC blue, MEP green, IT red, managers / account-switch members grey */
+/* Person dots: ARC blue, MEP green, everyone else (or a profile's dot_colour 'grey') grey */
 .pdot{width:9px;height:9px;min-height:0;padding:0;border-radius:50%;flex:none;display:inline-block;background:var(--dot-grey)}
-.pdot.arc{background:var(--dot-arc)}.pdot.mep{background:var(--dot-mep)}.pdot.it{background:var(--dot-it)}
+.pdot.arc{background:var(--dot-arc)}.pdot.mep{background:var(--dot-mep)}
 .pav:has(.pdot){background:none;width:16px}
 .pav .pdot{width:11px;height:11px}
 .sec h2{display:inline-flex;align-items:center;gap:7px}
-.mgr{--dot-arc:#2F6FD6;--dot-mep:#1E9A55;--dot-it:#D23B2F;--dot-grey:#7A8394}
-.mgr[data-theme="dark"]{--dot-arc:#5B95EE;--dot-mep:#3FBF78;--dot-it:#EE6A5E;--dot-grey:#8D97A8}
+.mgr{--dot-arc:#2F6FD6;--dot-mep:#1E9A55;--dot-grey:#7A8394}
+.mgr[data-theme="dark"]{--dot-arc:#5B95EE;--dot-mep:#3FBF78;--dot-grey:#8D97A8}

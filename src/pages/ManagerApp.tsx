@@ -82,7 +82,6 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [employees, setEmployees] = useState<Employee[]>([]);
   // Everyone who can be given a task: all employees and managers, the signed-in manager included.
   const [people, setPeople] = useState<Employee[]>([]);
-  const [switchIds, setSwitchIds] = useState<Set<string>>(new Set());
   // An account-switch member in Manager mode also decides other people's leave.
   const [coDecider, setCoDecider] = useState(false);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
@@ -132,7 +131,6 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       // Account-switch members stay assignable while they are in Manager mode.
       const sw = new Set(switchers);
       setCoDecider(sw.has(user.id));
-      setSwitchIds(sw);
       const byName = (a: Employee, b: Employee) => (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' });
       setEmployees(emps.filter(e => (e.role === 'EMPLOYEE' || sw.has(e.id)) && e.status !== 'INACTIVE').sort(byName));
       setPeople(emps.filter(e => (e.role === 'EMPLOYEE' || e.role === 'MANAGER') && e.status !== 'INACTIVE').sort(byName));
@@ -147,11 +145,12 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   }, [loadLeaves, loadCalendar]);
 
   const empName = (id?: string | null) => people.find(e => e.id === id)?.name || '';
-  // Discipline colour: ARC blue, MEP green, IT red; managers and account-switch members grey.
+  // Dot colour: the person's chosen colour if set, otherwise ARC blue, MEP green, everyone else grey.
   const dot = (id?: string | null) => {
     const m = people.find(e => e.id === id);
     const d = (m?.department || '').toUpperCase();
-    const c = !m || m.role === 'MANAGER' || switchIds.has(m.id) ? 'grey' : d === 'ARC' ? 'arc' : d === 'MEP' ? 'mep' : d === 'IT' ? 'it' : 'grey';
+    const c = m?.dotColour === 'blue' ? 'arc' : m?.dotColour === 'green' ? 'mep' : m?.dotColour === 'grey' ? 'grey'
+      : d === 'ARC' ? 'arc' : d === 'MEP' ? 'mep' : 'grey';
     return <span className={`pdot ${c}`} aria-hidden="true" />;
   };
   const typeName = (id: string) => (leaveTypes.find(t => t.id === id)?.name || id).replace(/ Leave$/, '');
