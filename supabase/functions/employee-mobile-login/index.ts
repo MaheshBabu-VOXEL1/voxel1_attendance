@@ -93,7 +93,7 @@ Deno.serve(async (req: Request) => {
 
     // These employees retain mobile login after switching to manager mode.
     const switchableManager = String(profile.role).toUpperCase() === 'MANAGER'
-      && ['9885229887', '7893960331', '7989626574', '7794862595', '8331951390']
+      && ['9885229887', '7893960331', '7989626574', '7794862595', '8331951390', '9795611931']
         .includes(normMobile(String(profile.mobile ?? '')) ?? '');
     if (String(profile.role).toUpperCase() !== 'EMPLOYEE' && !switchableManager) {
       return json(403, { message: 'Managers and Admins log in with email and password. Choose "Manager" above.' });

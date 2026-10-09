@@ -18,6 +18,7 @@ export const changelog: ChangelogRelease[] = [
     date: '2026-10-09',
     title: 'Employee and manager account switch',
     entries: [
+      { type: 'feature', description: 'Ahmad Ali (9795611931) is the sixth account-switch member: migration 0075 adds the number to is_mode_switcher, and the employee-mobile-login function lets the number log in while in Manager mode.' },
       { type: 'feature', description: 'The five account-switch members can be assigned tasks in either mode. They stay in the Assign list while in Manager mode, and migration 0074 lets assign, assign-from-backlog and task edits accept them (the mobile list now lives in one is_mode_switcher function).' },
       { type: 'improvement', description: 'The Manager board no longer shows a Check in button, because managers do not mark attendance. A member who checked in as an Employee and then switched to Manager still sees a Check out button to finish the day.' },
       { type: 'feature', description: 'All managers share the same organization task board, including members using the account switch. Each task shows who assigned it and to whom; searches also match the assigner name.' },
