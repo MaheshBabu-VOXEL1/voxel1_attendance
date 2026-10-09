@@ -4,8 +4,8 @@
 //                                       supabase.auth.verifyOtp({ token_hash, type: 'magiclink' }))
 //
 // Employees have no password: the organization enters them with their name and
-// mobile number, and the number alone logs them in. Managers and Admins keep
-// email + password and are refused here.
+// mobile number, and the number alone logs them in. The Manager (and members
+// in Manager mode) log in the same way; Admins are refused here.
 //
 // Where the employee comes from:
 //   1. profiles — anyone added in the app (Team Directory) or earlier.
@@ -91,12 +91,10 @@ Deno.serve(async (req: Request) => {
       profile = await createFromRoster(admin, roster);
     }
 
-    // These employees retain mobile login after switching to manager mode.
-    const switchableManager = String(profile.role).toUpperCase() === 'MANAGER'
-      && ['9885229887', '7893960331', '7989626574', '7794862595', '8331951390', '9795611931']
-        .includes(normMobile(String(profile.mobile ?? '')) ?? '');
-    if (String(profile.role).toUpperCase() !== 'EMPLOYEE' && !switchableManager) {
-      return json(403, { message: 'Managers and Admins log in with email and password. Choose "Manager" above.' });
+    // Everyone logs in by mobile (there is no email login page); only Admins are refused.
+    const role = String(profile.role).toUpperCase();
+    if (role !== 'EMPLOYEE' && role !== 'MANAGER') {
+      return json(403, { message: 'This account cannot log in with a mobile number.' });
     }
     if (profile.status === 'INACTIVE') {
       return json(403, { message: 'Your account has been deactivated. Please contact your administrator.' });
