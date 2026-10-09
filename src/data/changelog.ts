@@ -18,6 +18,7 @@ export const changelog: ChangelogRelease[] = [
     date: '2026-10-09',
     title: 'Employee and manager account switch',
     entries: [
+      { type: 'feature', description: 'Uday (8978612058) is the seventh account-switch member (migration 0079 adds the number to is_mode_switcher).' },
       { type: 'fix', description: 'The grey discipline dot used the class name "mgr", which is also the Manager screen root, so grey dots stretched into a tall grey bar down the Assign list. Renamed to "grey".' },
       { type: 'feature', description: 'People on the Manager board carry a discipline dot: ARC blue, MEP green, IT red, and grey for managers and account-switch members (and anyone with no discipline). Shown in the Assign list, on task rows, in the task sheet and on Person group headings. The discipline is the profile department.' },
       { type: 'fix', description: 'The leave balance box on the employee screen splits evenly between the leave types (two equal halves for Casual & Sick and Paid) instead of three fixed columns with an empty third one.' },
