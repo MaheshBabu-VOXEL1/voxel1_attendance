@@ -315,6 +315,14 @@ table.att{width:100%;border-collapse:collapse;font-size:13.5px}
 .pop,.sheet{overscroll-behavior:contain}
 /* Narrow phones: keep the filter row and the add-task row inside the screen. */
 @media (max-width:380px){ .tools .seg button{padding:0 9px} }
+.free-r{display:flex;align-items:center;gap:10px;min-height:52px;padding:6px 8px 6px 14px;border-top:1px solid var(--line)}
+.free-r:first-child{border-top:0}
+.free-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.free-n{min-width:0;display:flex;align-items:center;gap:7px;font-size:14px;font-weight:600;color:var(--ink)}
+.free-n > span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.free-s{padding-left:15px;font-size:12px;color:var(--faint);font-weight:600}
+.free-s.in{color:var(--ok)}
+.free-b{flex:none;height:40px;padding:0 10px;border:0;border-radius:9px;background:none;color:var(--steel);font-size:13px;font-weight:700}
 @media (max-width:359px){
   .tools{gap:4px} .tools .seg button{padding:0 7px}
   .c2{flex-wrap:wrap} .c2 .dseg{flex:1 1 100%}

@@ -241,6 +241,17 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [text, setText] = useState('');
   const [adding, setAdding] = useState(false);
   const [groupBy, setGroupBy] = useState<Group>('date');
+  // Who checked in today, for the Person view's "No task" list.
+  const [inToday, setInToday] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    if (groupBy !== 'person') return;
+    let alive = true;
+    const load = () => hrService.getAttendance({ since: T0, until: T0 })
+      .then(rows => { if (alive) setInToday(new Set(rows.filter(r => r.checkIn).map(r => r.employeeId))); }).catch(() => {});
+    void load();
+    const timer = window.setInterval(() => { if (!document.hidden) void load(); }, 60000);
+    return () => { alive = false; clearInterval(timer); };
+  }, [groupBy, T0]);
   const [pfilter, setPfilter] = useState('all');
   const [searchOn, setSearchOn] = useState(false);
   const [q, setQ] = useState('');
@@ -469,6 +480,16 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       const none = open.filter(t => !t.project_name); if (none.length) groups.push({ t: 'No project', l: none, hide: 'p' });
     }
     const shown = groups.filter(g => g.l.length || g.keep);
+    // Person view: everyone with no open task (people on leave already have their own heading). Checked-in people first.
+    const free = groupBy === 'person' && pfilter === 'all' && !q.trim()
+      ? people.filter(m => !onLeave(m.id, T0) && !tasks.some(t => t.employee_id === m.id && t.status !== 'END'))
+        .sort((a, b) => Number(!!inToday?.has(b.id)) - Number(!!inToday?.has(a.id)) || a.name.localeCompare(b.name))
+      : [];
+    const giveTask = (id: string) => {
+      setCpWho(id);
+      const box = document.getElementById('addT') as HTMLInputElement | null;
+      box?.scrollIntoView({ behavior: 'smooth', block: 'center' }); box?.focus({ preventScroll: true });
+    };
 
     return <>
       <div className="ph"><div><h1>Tasks</h1><p>{plural(open.length, 'open task')}
@@ -509,7 +530,15 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
           <div className={`sec${g.cls ? ` ${g.cls}` : ''}`}><h2>{g.who && dot(g.who)}{g.t}</h2><span>{g.note || g.l.length}</span></div>
           {g.l.length > 0 && <div className="list">{g.l.map(t => <React.Fragment key={t.id}>{TaskRow(t, g.hide)}</React.Fragment>)}</div>}
         </React.Fragment>)}
-        {!shown.length && <div className="card empty" style={{ marginTop: 16 }}>{q ? `No tasks match “${q}”` : `No open tasks${pfilter === 'all' ? '' : ` on ${pfilter}`}`}</div>}
+        {free.length > 0 && <>
+          <div className="sec free-h"><h2>No task</h2><span>{free.length}</span></div>
+          <div className="list free">{free.map(m => <div className="free-r" key={m.id}>
+            <span className="free-t"><span className="free-n">{dot(m.id)}<span>{m.id === user.id ? `${m.name} (me)` : m.name}</span></span>
+              {inToday && <span className={`free-s${inToday.has(m.id) ? ' in' : ''}`}>{inToday.has(m.id) ? 'Checked in' : 'Not checked in'}</span>}</span>
+            <button type="button" className="free-b" aria-label={`Assign a task to ${m.name}`} onClick={() => giveTask(m.id)}>Assign task</button>
+          </div>)}</div>
+        </>}
+        {!shown.length && !free.length && <div className="card empty" style={{ marginTop: 16 }}>{q ? `No tasks match “${q}”` : `No open tasks${pfilter === 'all' ? '' : ` on ${pfilter}`}`}</div>}
         {done.length > 0 && <>
           <button className="more" onClick={() => setShowDone(!showDone)}>{showDone ? 'Hide' : 'Show'} completed ({done.length})</button>
           {showDone && <div className="list" style={{ marginTop: 6 }}>{[...done].sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || '')).map(t => <React.Fragment key={t.id}>{TaskRow(t)}</React.Fragment>)}</div>}

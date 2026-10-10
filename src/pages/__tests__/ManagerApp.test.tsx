@@ -157,6 +157,24 @@ describe('manager app', () => {
     } finally { tasks.splice(tasks.length - 2, 2); }
   });
 
+  it('lists people with no open task under No task in the Person view, and Assign task picks them in the add bar', async () => {
+    (hrService.getAttendance as any).mockResolvedValue([{ employeeId: 'e4', date: today, checkIn: '09:10' }]);
+    render(<ManagerApp user={user} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Person' }));
+    const list = await waitFor(() => { const l = document.querySelector('.list.free'); if (!l) throw new Error('no list'); return l as HTMLElement; });
+    await waitFor(() => expect(within(list).getByText('Checked in')).toBeInTheDocument());
+    const names = [...list.querySelectorAll('.free-n')].map(n => n.textContent);
+    expect(names[0]).toBe('Abhinay');
+    expect(names).toEqual(expect.arrayContaining(['Srikanth Gunda', 'Test Manager (me)', 'Maruthi']));
+    expect(names).not.toContain('Divya Kallepalli'); // has an open task (and is on leave today)
+    expect(names).not.toContain('Ravi'); // has an open task
+    fireEvent.click(within(list).getByRole('button', { name: 'Assign a task to Abhinay' }));
+    expect(document.querySelector('.comp .chipbtn')!.textContent).toContain('Abhinay');
+    fireEvent.click(screen.getByRole('tab', { name: 'Date' }));
+    expect(document.querySelector('.list.free')).toBeNull();
+    (hrService.getAttendance as any).mockResolvedValue([]);
+  });
+
   it('lists everyone as assignees, including managers and the signed-in manager as (me)', async () => {
     render(<ManagerApp user={user} />);
     await waitFor(() => expect(assignedTaskService.listModeSwitcherIds).toHaveBeenCalled());
