@@ -9,7 +9,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { DEFAULT_LEAVE_TYPES } from '../constants';
 import { ymd } from '../utils/attendanceSheet';
-import { halfDayDeadline, halfDayLate, clock } from '../utils/halfDay';
+import { halfDayLate, halfDayLabel } from '../utils/halfDay';
 import './ManagerApp.css';
 import AccountModeSwitch from '../components/AccountModeSwitch';
 
@@ -526,11 +526,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     const isDone = t.status === 'END', edit = canEdit(t);
     const dueInfo = !t.due_date ? null : (!isDone && diff(t.due_date) < 0)
       ? { c: 'over', x: `${-diff(t.due_date)} ${diff(t.due_date) === -1 ? 'day' : 'days'} overdue` } : { c: diff(t.due_date) === 0 ? 'today' : '', x: dueWord(t.half_day && diff(t.due_date) === 0 ? HALF : t.due_date) };
-    const finishBy = halfDayDeadline(t);
-    if (dueInfo && finishBy && !isDone && !(diff(t.due_date!) < 0)) {
-      if (now > finishBy.getTime()) { dueInfo.c = 'over'; dueInfo.x = `Half day · overdue since ${clock(finishBy)}`; }
-      else dueInfo.x = `Half day · by ${clock(finishBy)}`;
-    }
+    const half = halfDayLabel(t, now);
+    if (dueInfo && half && !(diff(t.due_date!) < 0)) { dueInfo.x = half.text; if (half.late) dueInfo.c = 'over'; }
     const doneOn = t.completed_at ? ymd(new Date(t.completed_at)) : '';
     const bits: React.ReactNode[] = [];
     if (hide !== 'p') bits.push(<span key="p" className="mp">{t.project_name || 'No project'}</span>);

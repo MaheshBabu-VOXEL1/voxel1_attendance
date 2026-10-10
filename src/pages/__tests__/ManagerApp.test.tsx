@@ -153,7 +153,7 @@ describe('manager app', () => {
     render(<ManagerApp user={user} />);
     const late = screen.getByRole('button', { name: 'Half day late' }).closest('.trw')!;
     expect(late.textContent).toMatch(/Half day · overdue since /);
-    expect(screen.getByRole('button', { name: 'Half day running' }).closest('.trw')!.textContent).toMatch(/Half day · by /);
+    expect(screen.getByRole('button', { name: 'Half day running' }).closest('.trw')!.textContent).toMatch(/Half day · finish by /);
     } finally { tasks.splice(tasks.length - 2, 2); }
   });
 

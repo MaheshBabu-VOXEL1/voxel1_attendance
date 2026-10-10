@@ -15,6 +15,10 @@ export interface AssignedTask {
   due_date?: string | null;
   /** Due today, to be finished within half a day (manager picked Half Day). */
   half_day?: boolean;
+  /** Working time before the current running stretch (Pause / Stuck / Done stop the clock). */
+  worked_seconds?: number;
+  /** When the current running stretch began; null while paused. */
+  work_resumed_at?: string | null;
   project_name?: string | null;
   status: TaskStatus;
   created: string;
