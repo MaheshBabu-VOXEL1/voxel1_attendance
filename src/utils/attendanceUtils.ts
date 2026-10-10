@@ -400,3 +400,15 @@ export const calculateEmployeeSummaries = (params: {
     return a.employeeName.localeCompare(b.employeeName);
   });
 };
+
+/**
+ * A punch time for people to read: "10:13 am". Accepts "HH:mm" or a full timestamp
+ * (the open session from workdaySessionManager keeps the raw check_in value).
+ */
+export const punchTimeLabel = (val?: string | null): string => {
+  if (!val) return '';
+  const hm = /^(\d{1,2}):(\d{2})/.exec(val);
+  const d = hm ? new Date(2000, 0, 1, +hm[1], +hm[2]) : new Date(val);
+  if (isNaN(d.getTime())) return val;
+  return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+};

@@ -8,6 +8,7 @@ import { Attendance, CustomLeaveType, LeaveBalance, LeaveRequest } from '../type
 import { DEFAULT_LEAVE_TYPES } from '../constants';
 import { ymd } from '../utils/attendanceSheet';
 import { halfDayLabel } from '../utils/halfDay';
+import { punchTimeLabel } from '../utils/attendanceUtils';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import './EmployeeDay.css';
@@ -138,7 +139,7 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
     <header className="appbar"><div className="appbar-in"><div className="account-brand"><a className="lockup" href="#/dashboard" aria-label="Voxel1 home"><img src="/img/employee-day-mark.png" alt="" /><span className="wm"><b>VOXEL1</b></span></a><AccountModeSwitch user={user} /></div><span className="chip-date chip-name" title={user.name || undefined}>{user.name || date(today).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })}</span></div></header>
     <main className="wrap">
       <section className="hero" aria-labelledby="dayTitle"><h1 id="dayTitle">{date(today).toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' })}</h1>
-        <div className="att"><div className="att-l"><span className={`dot${active ? '' : ' off'}`} /><div><b>{!ready ? 'Loading attendance…' : active ? 'Checked in' : attendance?.checkOut ? 'Checked out' : 'Not checked in'}</b><span>{punchTime ? `at ${punchTime}` : 'Start your day'}</span><button ref={apply} className="linkbtn al" onClick={showLeave} disabled={!ready || !canWrite}>Apply leave</button></div></div><button className={`btn att-btn ${active ? 'leave-btn' : 'in'}`} disabled={!ready || !canWrite} onClick={() => onNavigate(active ? 'attendance-finish' : 'attendance-quick-office')}>{active ? 'Check out' : 'Check in'}</button></div>
+        <div className="att"><div className="att-l"><span className={`dot${active ? '' : ' off'}`} /><div><b>{!ready ? 'Loading attendance…' : active ? 'Checked in' : attendance?.checkOut ? 'Checked out' : 'Not checked in'}</b><span>{punchTime ? `at ${punchTimeLabel(punchTime)}` : 'Start your day'}</span><button ref={apply} className="linkbtn al" onClick={showLeave} disabled={!ready || !canWrite}>Apply leave</button></div></div><button className={`btn att-btn ${active ? 'leave-btn' : 'in'}`} disabled={!ready || !canWrite} onClick={() => onNavigate(active ? 'attendance-finish' : 'attendance-quick-office')}>{active ? 'Check out' : 'Check in'}</button></div>
       </section>
       {error && <p className="err" role="alert">{error}</p>}
       <div className="tasks-h"><h2>My Tasks</h2><span>{tasks.filter(t => t.status !== 'END').length} open · {tasks.filter(doneToday).length} done today</span></div>

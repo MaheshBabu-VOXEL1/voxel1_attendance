@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { DEFAULT_LEAVE_TYPES } from '../constants';
 import { ymd } from '../utils/attendanceSheet';
 import { halfDayLate, halfDayLabel } from '../utils/halfDay';
+import { punchTimeLabel } from '../utils/attendanceUtils';
 import './ManagerApp.css';
 import AccountModeSwitch from '../components/AccountModeSwitch';
 
@@ -851,7 +852,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     const active = attReady && !!attendance?.checkIn && !attendance.checkOut;
     if (!active) return null;
     return <div className="mycheck"><div className="att-l"><span className="dot" />
-      <div><b>Checked in</b><span>at {attendance?.checkIn}</span></div></div>
+      <div><b>Checked in</b><span>at {punchTimeLabel(attendance?.checkIn)}</span></div></div>
       <button className="btn att-btn out" disabled={!onNavigate}
         onClick={() => onNavigate?.('attendance-finish')}>Check out</button></div>;
   }
