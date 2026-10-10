@@ -9,6 +9,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { DEFAULT_LEAVE_TYPES } from '../constants';
 import { ymd } from '../utils/attendanceSheet';
+import { halfDayDeadline, halfDayLate, clock } from '../utils/halfDay';
 import './ManagerApp.css';
 import AccountModeSwitch from '../components/AccountModeSwitch';
 
@@ -81,6 +82,9 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const dueWord = (d: string) => { if (d === HALF) return 'Half day'; const n = diff(d); return n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : n === 2 ? 'Day after' : dshort(d); };
 
   const [route, setRoute] = useState<Route>('tasks');
+  // Half-day tasks turn overdue 4 h 30 min after Start; re-render every minute so that shows without a reload.
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []);
   const { tasks: allTasks, loading: tasksLoading, error: tasksError, refresh } = useAssignedTasks();
   const [employees, setEmployees] = useState<Employee[]>([]);
   // Everyone who can be given a task: all employees and managers, the signed-in manager included.
@@ -426,7 +430,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       && (!q || `${t.description} ${t.project_name || ''} ${t.employee_name || ''} ${t.manager_name || ''}`.toLowerCase().includes(q.toLowerCase()));
     const open = tasks.filter(t => t.status !== 'END' && inF(t));
     const done = tasks.filter(t => t.status === 'END' && inF(t));
-    const over = open.filter(t => t.due_date && t.due_date < T0).length, stuck = open.filter(t => t.status === 'STUCK').length;
+    const over = open.filter(t => (t.due_date && t.due_date < T0) || halfDayLate(t, now)).length, stuck = open.filter(t => t.status === 'STUCK').length;
     const byDue = (a: AssignedTask, b: AssignedTask) => (a.due_date || '9').localeCompare(b.due_date || '9') || b.created.localeCompare(a.created);
 
     const add = async () => {
@@ -453,7 +457,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     type G = { t: string; l: AssignedTask[]; cls?: string; hide?: string; note?: string; keep?: boolean; who?: string };
     const groups: G[] = [];
     if (groupBy === 'date') {
-      ([['Overdue', (t: AssignedTask) => !!t.due_date && t.due_date < T0, 'over', ''], ['Today', (t: AssignedTask) => t.due_date === T0, '', 'due'],
+      ([['Overdue', (t: AssignedTask) => (!!t.due_date && t.due_date < T0) || halfDayLate(t, now), 'over', ''], ['Today', (t: AssignedTask) => t.due_date === T0 && !halfDayLate(t, now), '', 'due'],
         ['Tomorrow', (t: AssignedTask) => t.due_date === rd(1), '', 'due'], ['Later', (t: AssignedTask) => !!t.due_date && t.due_date > rd(1), '', ''],
         ['No due date', (t: AssignedTask) => !t.due_date, '', 'due']] as [string, (t: AssignedTask) => boolean, string, string][])
         .forEach(([t, f, cls, hide]) => groups.push({ t, l: open.filter(f).sort(byDue), cls, hide }));
@@ -522,13 +526,18 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     const isDone = t.status === 'END', edit = canEdit(t);
     const dueInfo = !t.due_date ? null : (!isDone && diff(t.due_date) < 0)
       ? { c: 'over', x: `${-diff(t.due_date)} ${diff(t.due_date) === -1 ? 'day' : 'days'} overdue` } : { c: diff(t.due_date) === 0 ? 'today' : '', x: dueWord(t.half_day && diff(t.due_date) === 0 ? HALF : t.due_date) };
+    const finishBy = halfDayDeadline(t);
+    if (dueInfo && finishBy && !isDone && !(diff(t.due_date!) < 0)) {
+      if (now > finishBy.getTime()) { dueInfo.c = 'over'; dueInfo.x = `Half day · overdue since ${clock(finishBy)}`; }
+      else dueInfo.x = `Half day · by ${clock(finishBy)}`;
+    }
     const doneOn = t.completed_at ? ymd(new Date(t.completed_at)) : '';
     const bits: React.ReactNode[] = [];
     if (hide !== 'p') bits.push(<span key="p" className="mp">{t.project_name || 'No project'}</span>);
     if (hide !== 'who') bits.push(<button key="w" className={`mb${t.employee_id ? '' : ' ph'}`} disabled={!edit}
       onClick={e => menuWho(e.currentTarget, t.employee_id, v => void update(t, { who: v || null }))}>{t.employee_id ? dot(t.employee_id) : I.userS}{t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Assign'}</button>);
     if (isDone) bits.push(<span key="d" className="mp" style={{ color: 'var(--ok)' }}>Done {doneOn === T0 ? 'today' : doneOn ? short(doneOn) : ''}</span>);
-    else if (hide !== 'due' || dueInfo?.c === 'over' || dueInfo?.x === 'Half day') bits.push(<button key="d" className={`mb${dueInfo ? (dueInfo.c ? ` ${dueInfo.c}` : '') : ' ph'}`} disabled={!edit}
+    else if (hide !== 'due' || dueInfo?.c === 'over' || (!!t.half_day && !!dueInfo)) bits.push(<button key="d" className={`mb${dueInfo ? (dueInfo.c ? ` ${dueInfo.c}` : '') : ' ph'}`} disabled={!edit}
       onClick={e => dueBar(e.currentTarget, (t.half_day && t.due_date === T0 ? HALF : t.due_date ?? null), v => void update(t, { due: v || null }))}>{I.calS}{dueInfo ? dueInfo.x : 'Due date'}</button>);
     if (t.status === 'STUCK') bits.push(<span key="s" className="mp sk">Stuck</span>);
     if (t.self_created) bits.push(<span key="o" className="ro">Written by employee</span>);

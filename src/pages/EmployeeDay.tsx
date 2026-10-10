@@ -7,6 +7,7 @@ import { useAssignedTasks } from '../hooks/useAssignedTasks';
 import { Attendance, CustomLeaveType, LeaveBalance, LeaveRequest } from '../types';
 import { DEFAULT_LEAVE_TYPES } from '../constants';
 import { ymd } from '../utils/attendanceSheet';
+import { halfDayDeadline, clock } from '../utils/halfDay';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import './EmployeeDay.css';
@@ -33,6 +34,9 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
   const [workingDays, setWorkingDays] = useState<string[]>([]);
   const [holidays, setHolidays] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
+  // Half-day tasks turn overdue 4 h 30 min after Start; re-render every minute.
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []);
   const [leaveTypes, setLeaveTypes] = useState<CustomLeaveType[]>(DEFAULT_LEAVE_TYPES.filter(t => t.hasBalance));
   const TYPES = leaveTypes.map(t => t.id);
   const label = (id: string) => (leaveTypes.find(t => t.id === id)?.name || id).replace(/ Leave$/, '');
@@ -141,7 +145,9 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
       <div className="search"><Search size={18} /><label htmlFor="task-query" className="vh">Search project or task</label><input id="task-query" type="search" placeholder="Search project or task" value={query} onChange={e => setQuery(e.target.value)} /></div>
       <div className="list" aria-live="polite">{taskError ? <p className="empty" role="alert">{taskError}</p> : loading ? <p className="empty">Loading tasks…</p> : !visible.length ? <p className="empty">{query ? `No tasks match “${query}”` : 'All clear for today'}</p> : visible.map(t => {
         const done = t.status === 'END', progress = t.status === 'START' || t.status === 'PROGRESS', stuck = t.status === 'STUCK';
-        return <div className={`task${done ? ' done' : ''}`} key={t.id}><div className="t"><div className="meta"><span className="p">Project: {t.project_name || 'No project'}</span><span className={`d${stuck ? ' stuck' : progress ? ' prog' : ''}`}>{done ? doneToday(t) ? 'Done today' : t.completed_at ? `Done ${short(ymd(new Date(t.completed_at)))}` : 'Done' : stuck ? 'Stuck' : progress ? 'In progress' : 'Not started'}</span></div><div className="ttl">{t.description}</div>{t.created && <div className="assigned-date">Assigned <time dateTime={t.created}>{new Date(t.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</time></div>}</div>{done ? <div className="donebox"><span className="ok"><Check size={13} />Done</span><button disabled={!!busy || !canWrite} onClick={() => updateTask(t,'START')}>Reopen</button></div> : <div className="seg"><button className={progress ? 'on' : ''} disabled={!!busy || !canWrite} onClick={() => updateTask(t,progress ? 'NOT_STARTED' : 'START')}>{progress ? 'Pause' : 'Start'}</button><button className={stuck ? 'on stuck' : ''} aria-pressed={stuck} disabled={!!busy || !canWrite} onClick={() => updateTask(t, stuck ? 'PROGRESS' : 'STUCK')}>Stuck</button><button disabled={!!busy || !canWrite} onClick={() => updateTask(t,'END')}>Done</button></div>}</div>;
+        const finishBy = halfDayDeadline(t), late = !!finishBy && !done && now > finishBy.getTime();
+        const half = !t.half_day || done ? null : finishBy ? (late ? `Half day · overdue since ${clock(finishBy)}` : `Half day · finish by ${clock(finishBy)}`) : t.due_date && t.due_date < today ? 'Half day · overdue' : 'Half day · 4h 30m from Start';
+        return <div className={`task${done ? ' done' : ''}`} key={t.id}><div className="t"><div className="meta"><span className="p">Project: {t.project_name || 'No project'}</span><span className={`d${stuck ? ' stuck' : progress ? ' prog' : ''}`}>{done ? doneToday(t) ? 'Done today' : t.completed_at ? `Done ${short(ymd(new Date(t.completed_at)))}` : 'Done' : stuck ? 'Stuck' : progress ? 'In progress' : 'Not started'}</span></div><div className="ttl">{t.description}</div>{half && <div className={`half${late || half === 'Half day · overdue' ? ' late' : ''}`}>{half}</div>}{t.created && <div className="assigned-date">Assigned <time dateTime={t.created}>{new Date(t.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</time></div>}</div>{done ? <div className="donebox"><span className="ok"><Check size={13} />Done</span><button disabled={!!busy || !canWrite} onClick={() => updateTask(t,'START')}>Reopen</button></div> : <div className="seg"><button className={progress ? 'on' : ''} disabled={!!busy || !canWrite} onClick={() => updateTask(t,progress ? 'NOT_STARTED' : 'START')}>{progress ? 'Pause' : 'Start'}</button><button className={stuck ? 'on stuck' : ''} aria-pressed={stuck} disabled={!!busy || !canWrite} onClick={() => updateTask(t, stuck ? 'PROGRESS' : 'STUCK')}>Stuck</button><button disabled={!!busy || !canWrite} onClick={() => updateTask(t,'END')}>Done</button></div>}</div>;
       })}</div>
       {!query.trim() && tasks.some(old) && <button className={`more${history ? ' open' : ''}`} aria-expanded={history} onClick={() => setHistory(!history)}>{history ? 'Hide finished tasks' : `Show more (${tasks.filter(old).length} finished earlier)`}<ChevronDown size={16}/></button>}
     </main>

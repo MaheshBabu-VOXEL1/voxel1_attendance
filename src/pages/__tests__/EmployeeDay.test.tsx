@@ -4,12 +4,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import EmployeeDay from '../EmployeeDay';
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ login: vi.fn() }) }));
 vi.mock('../../services/supabase', async (original) => { const actual = await original<typeof import('../../services/supabase')>(); return { ...actual, supabase: { ...actual.supabase, rpc: vi.fn(async () => ({ data: false, error: null })) } }; });
-const mocks = vi.hoisted(() => ({ status: vi.fn(), leave: vi.fn(), refresh: vi.fn() }));
+const mocks = vi.hoisted(() => ({ status: vi.fn(), leave: vi.fn(), refresh: vi.fn(), extra: [] as any[] }));
 vi.mock('../../context/ThemeContext', () => ({ useTheme: () => ({ darkMode: false }) }));
 vi.mock('../../context/SubscriptionContext', () => ({ useSubscription: () => ({ canPerformAction: () => true }) }));
 vi.mock('../../services/assignedTask.service', () => ({ assignedTaskService: { setStatus: mocks.status } }));
 vi.mock('../../services/employeeService', () => ({ employeeService: { applyForLeave: mocks.leave } }));
-vi.mock('../../hooks/useAssignedTasks', () => ({ useAssignedTasks: () => ({ loading: false, error: '', refresh: mocks.refresh, tasks: [{id:'task1',description:'Review model',project_name:'Vyoma',created:'2026-10-01T09:00:00Z',status:'START',completed_at:null}, {id:'task2',description:'Old drawing',status:'END',completed_at:'2020-01-01T10:00:00Z'}] }) }));
+vi.mock('../../hooks/useAssignedTasks', () => ({ useAssignedTasks: () => ({ loading: false, error: '', refresh: mocks.refresh, tasks: [{id:'task1',description:'Review model',project_name:'Vyoma',created:'2026-10-01T09:00:00Z',status:'START',completed_at:null}, {id:'task2',description:'Old drawing',status:'END',completed_at:'2020-01-01T10:00:00Z'}, ...mocks.extra] }) }));
 vi.mock('../../services/hrService', () => ({ hrService: {
   getLeaveBalance: async () => ({CASUAL_SICK:12,PAID:7}), getLeaves: async () => [],
   getLeaveTypes: async () => [{id:'CASUAL_SICK',name:'Casual & Sick Leave',color:'',hasBalance:true},{id:'PAID',name:'Paid Leave',color:'',hasBalance:true},{id:'UNPAID',name:'Unpaid Leave',color:'',hasBalance:false}],
@@ -19,7 +19,7 @@ vi.mock('../../services/hrService', () => ({ hrService: {
 } }));
 describe('employee reference screen', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.clearAllMocks(); mocks.extra.length = 0;
     HTMLDialogElement.prototype.showModal = function() { this.setAttribute('open',''); };
     HTMLDialogElement.prototype.close = function() { this.removeAttribute('open'); };
   });
@@ -88,5 +88,13 @@ describe('employee reference screen', () => {
     fireEvent.click(send);
     await waitFor(() => expect(mocks.leave).toHaveBeenCalledWith(expect.objectContaining({type:'PAID',startDate:iso,endDate:iso,totalDays:1,reason:'Family function'}),{id:'me'}));
     await screen.findByText('Paid leave request sent');
+  });
+  it('shows the half-day timer: 4h 30m from Start, then overdue', async () => {
+    mocks.extra.splice(0, mocks.extra.length, {id:'task3',description:'Late half day',project_name:'BD',status:'START',half_day:true,due_date:new Date().toISOString().slice(0,10),started_at:new Date(Date.now()-5*3600e3).toISOString(),completed_at:null}, {id:'task4',description:'Fresh half day',project_name:'BD',status:'NOT_STARTED',half_day:true,due_date:'2999-01-01',started_at:null,completed_at:null});
+    render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
+    await screen.findByText('Checked in');
+    const late = screen.getByText('Late half day').closest('.task')!.querySelector('.half')!;
+    expect(late.textContent).toMatch(/^Half day · overdue since /); expect(late).toHaveClass('late');
+    expect(screen.getByText('Fresh half day').closest('.task')!.querySelector('.half')!.textContent).toBe('Half day · 4h 30m from Start');
   });
 });

@@ -143,6 +143,20 @@ describe('manager app', () => {
     expect(assignedTaskService.createUnassigned).toHaveBeenCalledWith('Pump room check', 'Vyoma', today);
   });
 
+  it('moves a half-day task to Overdue 4 h 30 min after the employee started it', async () => {
+    const extra = [
+  { id: 't4', employee_id: 'e1', employee_name: 'Divya Kallepalli', assigned_by: 'mgr', manager_name: 'Test Manager', description: 'Half day late', project_name: 'Vyoma', due_date: today, half_day: true, started_at: new Date(Date.now() - 5 * 3600e3).toISOString(), status: 'START', self_created: false, created: '2026-10-08T02:00:00Z' },
+  { id: 't5', employee_id: 'e1', employee_name: 'Divya Kallepalli', assigned_by: 'mgr', manager_name: 'Test Manager', description: 'Half day running', project_name: 'Vyoma', due_date: today, half_day: true, started_at: new Date(Date.now() - 3600e3).toISOString(), status: 'START', self_created: false, created: '2026-10-08T01:00:00Z' },
+    ] as any[];
+    tasks.push(...extra);
+    try {
+    render(<ManagerApp user={user} />);
+    const late = screen.getByRole('button', { name: 'Half day late' }).closest('.trw')!;
+    expect(late.textContent).toMatch(/Half day · overdue since /);
+    expect(screen.getByRole('button', { name: 'Half day running' }).closest('.trw')!.textContent).toMatch(/Half day · by /);
+    } finally { tasks.splice(tasks.length - 2, 2); }
+  });
+
   it('lists everyone as assignees, including managers and the signed-in manager as (me)', async () => {
     render(<ManagerApp user={user} />);
     await waitFor(() => expect(assignedTaskService.listModeSwitcherIds).toHaveBeenCalled());
