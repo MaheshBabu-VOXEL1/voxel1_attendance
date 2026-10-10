@@ -37,10 +37,8 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
   const TYPES = leaveTypes.map(t => t.id);
   const label = (id: string) => (leaveTypes.find(t => t.id === id)?.name || id).replace(/ Leave$/, '');
   const [type, setType] = useState('');
-  const [when, setWhen] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [half, setHalf] = useState(false);
   const [note, setNote] = useState('');
   const [formError, setFormError] = useState('');
   const sheet = useRef<HTMLDialogElement>(null);
@@ -55,8 +53,6 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
   }, [open]);
   const apply = useRef<HTMLButtonElement>(null);
   const today = ymd(new Date());
-  const tomorrowDate = date(today); tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const tomorrow = ymd(tomorrowDate);
 
   useEffect(() => {
     let alive = true;
@@ -96,15 +92,14 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
     return () => { document.body.style.overflow = previous; };
   }, [open]);
   const close = () => { sheet.current?.close(); setOpen(false); apply.current?.focus(); };
-  const showLeave = () => { setType(TYPES[0] || ''); setWhen(''); setFrom(''); setTo(''); setHalf(false); setNote(''); setFormError(''); setOpen(true); };
-  const start = when === 'today' ? today : when === 'tomorrow' ? tomorrow : from;
-  const end = when === 'pick' ? to || from : start;
+  const showLeave = () => { setType(TYPES[0] || ''); setFrom(''); setTo(''); setNote(''); setFormError(''); setOpen(true); };
+  const start = from;
+  const end = to || from;
   let days = 0;
   if (start && end && end >= start) {
     for (let d = date(start); d <= date(end); d.setDate(d.getDate() + 1)) {
       if (workingDays.includes(d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()) && !holidays.includes(ymd(d))) days++;
     }
-    if (half && start === end && days) days = 0.5;
   }
   const remaining = Number(balance?.[type] || 0);
   const validation = !start ? '' : start < today ? 'Choose today or a future date.' : end < start ? 'End date is before the start date.' : !days ? 'These dates fall on non-working days.' : leaves.some(l => l.status !== 'REJECTED' && l.startDate <= end && l.endDate >= start) ? 'You already have a leave request on these dates.' : days > remaining ? `Only ${remaining} ${label(type).toLowerCase()} days left.` : '';
@@ -139,12 +134,9 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
     <header className="appbar"><div className="appbar-in"><div className="account-brand"><a className="lockup" href="#/dashboard" aria-label="Voxel1 home"><img src="/img/employee-day-mark.png" alt="" /><span className="wm"><b>VOXEL1</b></span></a><AccountModeSwitch user={user} /></div><span className="chip-date chip-name" title={user.name || undefined}>{user.name || date(today).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })}</span></div></header>
     <main className="wrap">
       <section className="hero" aria-labelledby="dayTitle"><h1 id="dayTitle">{date(today).toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' })}</h1>
-        <div className="att"><div className="att-l"><span className={`dot${active ? '' : ' off'}`} /><div><b>{!ready ? 'Loading attendance…' : active ? 'Checked in' : attendance?.checkOut ? 'Checked out' : 'Not checked in'}</b><span>{punchTime ? `at ${punchTime}` : 'Start your day'}</span></div></div><button className={`btn att-btn ${active ? 'leave-btn' : 'in'}`} disabled={!ready || !canWrite} onClick={() => onNavigate(active ? 'attendance-finish' : 'attendance-quick-office')}>{active ? 'Check out' : 'Check in'}</button></div>
+        <div className="att"><div className="att-l"><span className={`dot${active ? '' : ' off'}`} /><div><b>{!ready ? 'Loading attendance…' : active ? 'Checked in' : attendance?.checkOut ? 'Checked out' : 'Not checked in'}</b><span>{punchTime ? `at ${punchTime}` : 'Start your day'}</span><button ref={apply} className="linkbtn al" onClick={showLeave} disabled={!ready || !canWrite}>Apply leave</button></div></div><button className={`btn att-btn ${active ? 'leave-btn' : 'in'}`} disabled={!ready || !canWrite} onClick={() => onNavigate(active ? 'attendance-finish' : 'attendance-quick-office')}>{active ? 'Check out' : 'Check in'}</button></div>
       </section>
       {error && <p className="err" role="alert">{error}</p>}
-      <section className="card leave" aria-labelledby="leaveTitle"><div className="row-h"><h2 id="leaveTitle">Leave balance</h2><button ref={apply} className="linkbtn" onClick={showLeave} disabled={!ready || !canWrite}>Apply leave</button></div><div className="bal">{TYPES.map(t => <div key={t}><b>{balance ? Number(balance[t] || 0) : '–'}</b><span>{label(t)}</span></div>)}</div>
-        <div className="upc"><h3>Upcoming leave requests</h3>{!ready ? <span>Loading requests…</span> : !upcoming.length ? <span>No upcoming requests</span> : upcoming.map(l => <div className="lv" key={l.id}><div className="cal"><b>{date(l.startDate).getDate()}</b><span>{date(l.startDate).toLocaleDateString('en-GB',{month:'short'})}</span></div><div className="t"><b>{label(l.type)} leave</b><span>{l.startDate === l.endDate ? date(l.startDate).toLocaleDateString('en-GB',{weekday:'long'}) : `${short(l.startDate)} – ${short(l.endDate)}`}, {l.totalDays === 0.5 ? 'Half day' : `${l.totalDays} ${l.totalDays === 1 ? 'day' : 'days'}`}</span></div><span className={`pill ${l.status === 'APPROVED' ? 'ok' : l.status === 'REJECTED' ? 'bad' : 'pend'}`}>{l.status === 'APPROVED' ? '✓ Approved' : l.status === 'REJECTED' ? '× Rejected' : '◷ Pending'}</span></div>)}</div>
-      </section>
       <div className="tasks-h"><h2>My Tasks</h2><span>{tasks.filter(t => t.status !== 'END').length} open · {tasks.filter(doneToday).length} done today</span></div>
       <div className="search"><Search size={18} /><label htmlFor="task-query" className="vh">Search project or task</label><input id="task-query" type="search" placeholder="Search project or task" value={query} onChange={e => setQuery(e.target.value)} /></div>
       <div className="list" aria-live="polite">{taskError ? <p className="empty" role="alert">{taskError}</p> : loading ? <p className="empty">Loading tasks…</p> : !visible.length ? <p className="empty">{query ? `No tasks match “${query}”` : 'All clear for today'}</p> : visible.map(t => {
@@ -153,13 +145,14 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
       })}</div>
       {!query.trim() && tasks.some(old) && <button className={`more${history ? ' open' : ''}`} aria-expanded={history} onClick={() => setHistory(!history)}>{history ? 'Hide finished tasks' : `Show more (${tasks.filter(old).length} finished earlier)`}<ChevronDown size={16}/></button>}
     </main>
-    {open && <dialog ref={sheet} className="sheet show" aria-labelledby="sheetTitle" style={kbLift ? { bottom: kbLift, maxHeight: `calc(100% - ${kbLift + 12}px)` } : undefined} onCancel={e => { e.preventDefault(); if (busy !== 'leave') close(); }} onClick={e => { if (e.target === e.currentTarget && busy !== 'leave') { const r=e.currentTarget.getBoundingClientRect(); if(e.clientY < r.top || e.clientX < r.left || e.clientX > r.right) close(); } }}><div className="grab"/><div className="sheet-h"><h2 id="sheetTitle">Apply leave</h2><button className="x" aria-label="Close" disabled={busy === 'leave'} onClick={close}><X size={18}/></button></div>
-      <div className="fl"><span className="lab">Type</span><div className={`opts c${Math.min(Math.max(TYPES.length, 1), 3)}`}>{TYPES.map(t => <button key={t} className="opt" aria-pressed={type===t} onClick={() => setType(t)}><b>{label(t)}</b><span>{Number(balance?.[t] || 0)} left</span></button>)}</div></div>
-      <div className="fl"><span className="lab">When</span><div className="opts c3">{['today','tomorrow','pick'].map(w => <button key={w} className="opt" aria-pressed={when===w} onClick={() => {setWhen(w); setHalf(false);}}><b>{w==='pick' ? 'Pick dates' : w==='today' ? 'Today' : 'Tomorrow'}</b><span>{w==='pick' ? 'From – to' : short(w==='today' ? today : tomorrow)}</span></button>)}</div>
-      {when === 'pick' && <div className="dates show"><div className="field"><label htmlFor="leave-from">From</label><input id="leave-from" type="date" min={today} value={from} onChange={e => {setFrom(e.target.value);setHalf(false);}}/></div><div className="field"><label htmlFor="leave-to">To</label><input id="leave-to" type="date" min={from || today} value={to} onChange={e => {setTo(e.target.value);setHalf(false);}}/></div></div>}
-      <div className="switch-row"><div><b>Half day</b><span>Single-day leave only</span></div><button className="sw" role="switch" aria-label="Half day" aria-checked={half} disabled={!start || start!==end} onClick={() => setHalf(!half)}/></div></div>
-      <div className="fl"><label className="lab" htmlFor="leave-note">Note for your manager (required)</label><textarea id="leave-note" className="note" rows={1} required placeholder="e.g. Family function" value={note} onChange={e => setNote(e.target.value)}/></div>
-      <div className="sum"><div><b>{start ? start===end ? short(start) : `${short(start)} – ${short(end)}` : 'Choose a date'}</b><span style={{display:'block'}}>{start ? `${label(type)} leave` : 'Non-working days are not counted'}</span></div><div className="n">{start ? days : '–'}<small>{days===1 ? 'day' : 'days'}</small></div></div><div className="err" role="alert">{formError || validation}</div><button className="btn primary send" disabled={!!busy || !canWrite || !start || !days || !!validation || !note.trim()} onClick={submitLeave}>{busy==='leave' ? 'Sending…' : 'Send request'}</button>
+    {open && <dialog ref={sheet} className="sheet show" aria-labelledby="sheetTitle" style={kbLift ? { bottom: kbLift, maxHeight: `calc(100% - ${kbLift + 12}px)` } : undefined} onCancel={e => { e.preventDefault(); if (busy !== 'leave') close(); }} onClick={e => { if (e.target === e.currentTarget && busy !== 'leave') { const r=e.currentTarget.getBoundingClientRect(); if(e.clientY < r.top || e.clientX < r.left || e.clientX > r.right) close(); } }}><div className="grab"/><div className="sheet-h"><h2 id="sheetTitle">Leave</h2><button className="x" aria-label="Close" disabled={busy === 'leave'} onClick={close}><X size={18}/></button></div>
+      <div className="bal">{TYPES.map(t => <div key={t}><b>{balance ? Number(balance[t] || 0) : '–'}</b><span>{label(t)}</span></div>)}</div>
+      <div className="fl"><span className="lab" id="leave-type">Leave type</span><div className="tseg" role="radiogroup" aria-labelledby="leave-type">{TYPES.map(t => <button key={t} role="radio" aria-checked={type===t} onClick={() => setType(t)}>{label(t)}</button>)}</div></div>
+      <div className="fl dates show"><div className="field"><label htmlFor="leave-from">From</label><input id="leave-from" type="date" min={today} value={from} onChange={e => { const v = e.target.value; setFrom(v); if (!to || to < v) setTo(v); }}/></div><div className="field"><label htmlFor="leave-to">To</label><input id="leave-to" type="date" min={from || today} value={to} onChange={e => setTo(e.target.value)}/></div></div>
+      <div className="fl"><label className="lab" htmlFor="leave-note">Reason</label><input id="leave-note" className="note" required placeholder="e.g. Family function" autoComplete="off" value={note} onChange={e => setNote(e.target.value)}/></div>
+      {formError || validation ? <div className="err" role="alert">{formError || validation}</div> : <div className="msg">{!start ? 'Select dates' : <><b>{days} {days === 1 ? 'day' : 'days'}</b> · {remaining - days} {label(type)} left after{!note.trim() && ' · add a reason'}</>}</div>}
+      <button className="btn primary send" disabled={!!busy || !canWrite || !start || !days || !!validation || !note.trim()} onClick={submitLeave}>{busy==='leave' ? 'Sending…' : 'Apply leave'}</button>
+      <div className="upc"><h3>Upcoming leave requests</h3>{!upcoming.length ? <span>No upcoming requests</span> : upcoming.map(l => <div className="lv" key={l.id}><div className="cal"><b>{date(l.startDate).getDate()}</b><span>{date(l.startDate).toLocaleDateString('en-GB',{month:'short'})}</span></div><div className="t"><b>{label(l.type)} leave</b><span>{l.startDate === l.endDate ? date(l.startDate).toLocaleDateString('en-GB',{weekday:'long'}) : `${short(l.startDate)} – ${short(l.endDate)}`}, {l.totalDays === 0.5 ? 'Half day' : `${l.totalDays} ${l.totalDays === 1 ? 'day' : 'days'}`}</span></div><span className={`pill ${l.status === 'APPROVED' ? 'ok' : l.status === 'REJECTED' ? 'bad' : 'pend'}`}>{l.status === 'APPROVED' ? '✓ Approved' : l.status === 'REJECTED' ? '× Rejected' : '◷ Pending'}</span></div>)}</div>
     </dialog>}
     {message && <div className="toast show" role="status"><span>{message}</span>{undo && <button disabled={!!busy} onClick={() => updateTask(undo,undo.status,true)}>Undo</button>}</div>}
   </div>;

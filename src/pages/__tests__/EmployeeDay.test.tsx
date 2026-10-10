@@ -27,7 +27,8 @@ describe('employee reference screen', () => {
     const navigate=vi.fn(); render(<EmployeeDay user={{id:'me'}} onNavigate={navigate}/>);
     await screen.findByText('Checked in');
     fireEvent.click(screen.getByText('Check out')); expect(navigate).toHaveBeenCalledWith('attendance-finish');
-    expect(screen.getByText('Leave balance')).toBeTruthy(); expect(screen.getByText('My Tasks')).toBeTruthy();
+    expect(screen.queryByText('Leave balance')).toBeNull(); expect(screen.getByText('My Tasks')).toBeTruthy();
+    expect(screen.getByText('Apply leave').closest('.att')).toBeTruthy();
     expect(screen.queryByText('Old drawing')).toBeNull();
     fireEvent.click(screen.getByText('Show more (1 finished earlier)')); expect(screen.getByText('Old drawing')).toBeTruthy();
     expect(screen.queryByRole('navigation')).toBeNull();
@@ -35,7 +36,8 @@ describe('employee reference screen', () => {
   it('shows the organization leave types and balances, not a fixed Annual/Casual/Sick list', async () => {
     render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
     await screen.findByText('Checked in');
-    const bal = screen.getByText('Leave balance').closest('section')!;
+    fireEvent.click(screen.getByText('Apply leave'));
+    const bal = document.querySelector('.sheet .bal')!;
     await waitFor(() => expect(bal.textContent).toContain('Casual & Sick'));
     expect(bal.textContent).toContain('12'); expect(bal.textContent).toContain('Paid'); expect(bal.textContent).toContain('7');
     expect(bal.textContent).not.toContain('Annual'); expect(bal.textContent).not.toContain('Unpaid');
@@ -66,24 +68,25 @@ describe('employee reference screen', () => {
     await waitFor(() => expect(mocks.status).toHaveBeenCalledWith('task1','NOT_STARTED'));
     await screen.findByText('Connection failed'); expect(screen.queryByText('Paused')).toBeNull();
   });
-  it('submits half-day leave with the signed-in employee', async () => {
+  it('submits leave from the check-in card with the signed-in employee', async () => {
     render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
     await screen.findByText('Checked in'); fireEvent.click(screen.getByText('Apply leave'));
-    fireEvent.click(screen.getByText('Today')); fireEvent.click(screen.getByRole('switch',{name:'Half day'}));
-    const note = screen.getByRole('textbox', {name:'Note for your manager (required)'});
-    const send = screen.getByRole('button', {name:'Send request'});
+    expect(screen.getByText('Upcoming leave requests')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', {name:'Paid'}));
+    const day = new Date(); day.setDate(day.getDate() + 3);
+    const iso = `${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`;
+    fireEvent.change(screen.getByLabelText('From'), {target:{value:iso}});
+    expect(screen.getByLabelText('To')).toHaveValue(iso);
+    const note = screen.getByRole('textbox', {name:'Reason'});
+    const send = document.querySelector<HTMLButtonElement>('.sheet .send')!;
     expect(note).toBeRequired();
     expect(send).toBeDisabled();
-    fireEvent.click(send);
-    expect(mocks.leave).not.toHaveBeenCalled();
     fireEvent.change(note, {target:{value:'   '}});
     expect(send).toBeDisabled();
-    fireEvent.click(send);
-    expect(mocks.leave).not.toHaveBeenCalled();
     fireEvent.change(note, {target:{value:' Family function '}});
     expect(send).toBeEnabled();
-    fireEvent.click(screen.getByText('Send request'));
-    await waitFor(() => expect(mocks.leave).toHaveBeenCalledWith(expect.objectContaining({type:'CASUAL_SICK',totalDays:0.5,reason:'Family function'}),{id:'me'}));
-    await screen.findByText('Casual & Sick leave request sent');
+    fireEvent.click(send);
+    await waitFor(() => expect(mocks.leave).toHaveBeenCalledWith(expect.objectContaining({type:'PAID',startDate:iso,endDate:iso,totalDays:1,reason:'Family function'}),{id:'me'}));
+    await screen.findByText('Paid leave request sent');
   });
 });

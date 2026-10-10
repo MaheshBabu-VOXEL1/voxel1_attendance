@@ -15,6 +15,13 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-10-10',
+    title: 'Apply leave from the check-in card',
+    entries: [
+      { type: 'improvement', description: 'Employee screen: the Leave balance card is gone. "Apply leave" now sits inside the check-in card under the status, and opens one Leave sheet with the balances, Leave type, From/To dates, Reason, the Apply leave button and upcoming leave requests. The Today/Tomorrow shortcuts and the half-day switch are no longer in the form.' },
+    ],
+  },
+  {
     date: '2026-10-09',
     title: 'Employee and manager account switch',
     entries: [

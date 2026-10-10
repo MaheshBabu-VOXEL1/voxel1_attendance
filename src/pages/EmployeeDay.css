@@ -100,6 +100,20 @@ h3{margin:0;font-size:12.5px;font-weight:700;color:var(--muted)}
 &[data-theme="dark"] .att-btn.in,&[data-theme="dark"] .att-btn.leave-btn{color:#fff}
 @media (prefers-color-scheme: dark){&:not([data-theme="light"]) .att-btn.in,&:not([data-theme="light"]) .att-btn.leave-btn{color:#fff}}
 .linkbtn{height:40px;padding:0 4px;border:0;background:none;color:var(--steel);font-weight:600;font-size:13.5px}
+/* Apply leave link inside the check-in card */
+.att-l{align-items:flex-start}.att-l .dot{margin-top:8px}
+.att-l .al{display:block;height:30px;margin-top:2px;padding:0;font-size:13px;text-align:left}
+/* Leave sheet: balance, type, dates, reason, upcoming */
+.tseg{display:flex;border:1px solid var(--line-2);border-radius:10px;overflow:hidden}
+.tseg button{flex:1;min-width:0;height:44px;border:0;background:var(--surface);font-size:14px;font-weight:600;color:var(--muted)}
+.tseg button+button{border-left:1px solid var(--line-2)}
+.tseg button[aria-checked="true"]{background:var(--tint);color:var(--steel)}
+.sheet .dates{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.sheet .field{min-width:0}.sheet .field input{min-width:0;font-size:16px}
+.sheet .note{height:44px;font-size:16px;min-height:0;padding:0 12px}
+.msg{margin-top:12px;font-size:13px;color:var(--muted)}
+.msg b{color:var(--ink)}
+.sheet .upc{margin-top:16px}
+.upc > span{font-size:13px;color:var(--muted)}
 .card.leave{padding:12px 14px}
 .card.leave h2{font-size:14px;color:var(--muted);font-weight:600}
 .card.leave .bal b{font-size:17px}
