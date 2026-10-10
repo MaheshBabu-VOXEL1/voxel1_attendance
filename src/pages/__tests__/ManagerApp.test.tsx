@@ -40,7 +40,7 @@ vi.mock('../../services/calendar.service', () => ({ calendarService: {
 } }));
 vi.mock('../../services/assignedTask.service', async (orig) => {
   const real = await orig<typeof import('../../services/assignedTask.service')>();
-  return { ...real, assignedTaskService: { setStatus: vi.fn(async () => ({})), listModeSwitcherIds: vi.fn(async () => ['e3']), listProjects: vi.fn(async () => [{ id: 'p2', name: 'KAFD', project_number: 2 }]), createProject: vi.fn(async (n: string) => ({ id: 'p3', name: n, project_number: 3 })), assign: vi.fn(async () => ({ id: 'n1' })), createUnassigned: vi.fn(async () => ({ id: 'n2' })), managerUpdate: vi.fn(async () => ({})), managerDelete: vi.fn(async () => {}) } };
+  return { ...real, assignedTaskService: { setStatus: vi.fn(async () => ({})), listModeSwitcherIds: vi.fn(async () => ['e3']), listProjects: vi.fn(async () => [{ id: 'p2', name: 'KAFD', project_number: 2 }]), createProject: vi.fn(async (n: string) => ({ id: 'p3', name: n, project_number: 3 })), assign: vi.fn(async () => ({ id: 'n1' })), createUnassigned: vi.fn(async () => ({ id: 'n2' })), managerUpdate: vi.fn(async () => ({})), setHalfDay: vi.fn(async () => ({})), managerDelete: vi.fn(async () => {}) } };
 });
 
 const user = { id: 'mgr', name: 'Test Manager', role: 'MANAGER', email: 'tm@example.com' } as any;
@@ -128,6 +128,19 @@ describe('manager app', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(assignedTaskService.createUnassigned).toHaveBeenCalledWith('Pump room check', 'Vyoma', ''));
     expect(assignedTaskService.assign).not.toHaveBeenCalled();
+  });
+
+  it('offers Half Day, Today and Tomorrow (no Day after); Half Day saves a task due today marked half day', async () => {
+    render(<ManagerApp user={user} />);
+    const seg = screen.getAllByRole('group', { name: 'Due date' })[0];
+    expect(within(seg).getAllByRole('button').map(b => b.textContent)).toEqual(['Half Day', 'Today', 'Tomorrow']);
+    fireEvent.change(screen.getByLabelText('New task'), { target: { value: 'Pump room check' } });
+    fireEvent.click(within(seg).getByRole('button', { name: 'Half Day' }));
+    expect(within(seg).getByRole('button', { name: 'Half Day' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(seg).getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(assignedTaskService.setHalfDay).toHaveBeenCalledWith('n2', true));
+    expect(assignedTaskService.createUnassigned).toHaveBeenCalledWith('Pump room check', 'Vyoma', today);
   });
 
   it('lists everyone as assignees, including managers and the signed-in manager as (me)', async () => {

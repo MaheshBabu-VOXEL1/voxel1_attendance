@@ -75,7 +75,10 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const T0 = ymd(new Date());
   const rd = (n: number) => ymd(addDays(parse(T0), n));
   const diff = (s: string) => Math.round((parse(s).getTime() - parse(T0).getTime()) / 864e5);
-  const dueWord = (d: string) => { const n = diff(d); return n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : n === 2 ? 'Day after' : dshort(d); };
+  // DueSeg value for Half Day: due today, marked half_day.
+  const HALF = 'half';
+  const dueOf = (v: string) => v === HALF ? T0 : v;
+  const dueWord = (d: string) => { if (d === HALF) return 'Half day'; const n = diff(d); return n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : n === 2 ? 'Day after' : dshort(d); };
 
   const [route, setRoute] = useState<Route>('tasks');
   const { tasks: allTasks, loading: tasksLoading, error: tasksError, refresh } = useAssignedTasks();
@@ -316,16 +319,19 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     }
     const prev = { employeeId: t.employee_id, dueDate: t.due_date ?? null, status: t.status, projectName: t.project_name || 'General', description: t.description };
     const next = {
-      employeeId: 'who' in ch ? (ch.who || null) : prev.employeeId, dueDate: 'due' in ch ? (ch.due || null) : prev.dueDate,
+      employeeId: 'who' in ch ? (ch.who || null) : prev.employeeId, dueDate: 'due' in ch ? (ch.due ? dueOf(ch.due) : null) : prev.dueDate,
       status: ch.s ?? prev.status, projectName: ch.p ?? prev.projectName, description: ch.text ?? prev.description,
     };
     try {
-      await assignedTaskService.managerUpdate(t.id, next); await refresh();
+      const half = 'due' in ch ? ch.due === HALF : !!t.half_day;
+      await assignedTaskService.managerUpdate(t.id, next);
+      if (half !== !!t.half_day || (half && next.dueDate !== prev.dueDate)) await assignedTaskService.setHalfDay(t.id, half);
+      await refresh();
       if (quiet) return;
       const msg = 'who' in ch ? (next.employeeId ? `Assigned to ${empName(next.employeeId)}` : 'Moved to backlog')
-        : 'due' in ch ? (next.dueDate ? `Due ${dueWord(next.dueDate)}` : 'Due date removed')
+        : 'due' in ch ? (next.dueDate ? `Due ${dueWord(half ? HALF : next.dueDate)}` : 'Due date removed')
         : ch.s ? ST[ch.s][0] : ch.p ? `Moved to ${ch.p}` : 'Saved';
-      say(msg, () => { void assignedTaskService.managerUpdate(t.id, prev).then(refresh).catch(fail); });
+      say(msg, () => { void assignedTaskService.managerUpdate(t.id, prev).then(() => assignedTaskService.setHalfDay(t.id, !!t.half_day)).then(refresh).catch(fail); });
     } catch (e) { fail(e); }
   };
   const remove = async (t: AssignedTask) => {
@@ -404,7 +410,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
 
   // ================= views (closures over the state above) =================
   function DueSeg(cur: string | null, onPick: (v: string) => void, clearable = false) {
-    const opts: [string, string][] = [['Today', T0], ['Tomorrow', rd(1)], ['Day after', rd(2)]];
+    const opts: [string, string][] = [['Half Day', HALF], ['Today', T0], ['Tomorrow', rd(1)]];
     const custom = !!cur && !opts.some(o => o[1] === cur);
     return <div className="dseg" role="group" aria-label="Due date">
       {opts.map(([l, v]) => <button key={l} type="button" aria-pressed={cur === v} onClick={() => onPick(cur === v ? '' : v)}>{l}</button>)}
@@ -431,7 +437,12 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       setAdding(true);
       try {
         const created: AssignedTask[] = [];
-        for (const d of items) created.push(cpWho ? await assignedTaskService.assign(cpWho, d, project, cpDue, 'NOT_STARTED') : await assignedTaskService.createUnassigned(d, project, cpDue));
+        const due = dueOf(cpDue);
+        for (const d of items) {
+          const c = cpWho ? await assignedTaskService.assign(cpWho, d, project, due, 'NOT_STARTED') : await assignedTaskService.createUnassigned(d, project, due);
+          created.push(c);
+          if (cpDue === HALF) await assignedTaskService.setHalfDay(c.id, true);
+        }
         const msg = `${items.length > 1 ? `${items.length} tasks added` : 'Added'} · ${project}${cpWho ? ` · ${empName(cpWho)}` : ''}${cpDue ? ` · ${dueWord(cpDue)}` : ''}`;
         setText(''); setCpWho(''); setCpDue('');
         await Promise.all([refresh(), loadProjects()]);
@@ -510,15 +521,15 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     const parts = (el: HTMLElement) => ({ row: el, l: el.parentElement!.querySelector('.swbg.l') as HTMLElement, r: el.parentElement!.querySelector('.swbg.r') as HTMLElement });
     const isDone = t.status === 'END', edit = canEdit(t);
     const dueInfo = !t.due_date ? null : (!isDone && diff(t.due_date) < 0)
-      ? { c: 'over', x: `${-diff(t.due_date)} ${diff(t.due_date) === -1 ? 'day' : 'days'} overdue` } : { c: diff(t.due_date) === 0 ? 'today' : '', x: dueWord(t.due_date) };
+      ? { c: 'over', x: `${-diff(t.due_date)} ${diff(t.due_date) === -1 ? 'day' : 'days'} overdue` } : { c: diff(t.due_date) === 0 ? 'today' : '', x: dueWord(t.half_day && diff(t.due_date) === 0 ? HALF : t.due_date) };
     const doneOn = t.completed_at ? ymd(new Date(t.completed_at)) : '';
     const bits: React.ReactNode[] = [];
     if (hide !== 'p') bits.push(<span key="p" className="mp">{t.project_name || 'No project'}</span>);
     if (hide !== 'who') bits.push(<button key="w" className={`mb${t.employee_id ? '' : ' ph'}`} disabled={!edit}
       onClick={e => menuWho(e.currentTarget, t.employee_id, v => void update(t, { who: v || null }))}>{t.employee_id ? dot(t.employee_id) : I.userS}{t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Assign'}</button>);
     if (isDone) bits.push(<span key="d" className="mp" style={{ color: 'var(--ok)' }}>Done {doneOn === T0 ? 'today' : doneOn ? short(doneOn) : ''}</span>);
-    else if (hide !== 'due' || dueInfo?.c === 'over') bits.push(<button key="d" className={`mb${dueInfo ? (dueInfo.c ? ` ${dueInfo.c}` : '') : ' ph'}`} disabled={!edit}
-      onClick={e => dueBar(e.currentTarget, t.due_date ?? null, v => void update(t, { due: v || null }))}>{I.calS}{dueInfo ? dueInfo.x : 'Due date'}</button>);
+    else if (hide !== 'due' || dueInfo?.c === 'over' || dueInfo?.x === 'Half day') bits.push(<button key="d" className={`mb${dueInfo ? (dueInfo.c ? ` ${dueInfo.c}` : '') : ' ph'}`} disabled={!edit}
+      onClick={e => dueBar(e.currentTarget, (t.half_day && t.due_date === T0 ? HALF : t.due_date ?? null), v => void update(t, { due: v || null }))}>{I.calS}{dueInfo ? dueInfo.x : 'Due date'}</button>);
     if (t.status === 'STUCK') bits.push(<span key="s" className="mp sk">Stuck</span>);
     if (t.self_created) bits.push(<span key="o" className="ro">Written by employee</span>);
 
@@ -534,7 +545,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       const s = sw.current; if (!s.on) return; const p = parts(e.currentTarget);
       p.row.classList.remove('drag'); p.row.style.transform = ''; p.l.style.opacity = '0'; p.r.style.opacity = '0'; s.at = Date.now(); s.on = false;
       if (s.dx > 90) void update(t, { s: isDone ? 'NOT_STARTED' : 'END' });
-      else if (s.dx < -90) dueBar(p.row.querySelector('.tt') as HTMLElement, t.due_date ?? null, v => void update(t, { due: v || null }));
+      else if (s.dx < -90) dueBar(p.row.querySelector('.tt') as HTMLElement, (t.half_day && t.due_date === T0 ? HALF : t.due_date ?? null), v => void update(t, { due: v || null }));
     };
     const swiped = () => Date.now() - sw.current.at < 350;
     return <div className="trw">
@@ -571,7 +582,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         <div className="f"><span>Assigned to</span><button className="fv" disabled={!edit} aria-haspopup="listbox" onClick={e => menuWho(e.currentTarget, t.employee_id, v => void update(t, { who: v || null }))}>{t.employee_id ? dot(t.employee_id) : I.user}<span>{t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Not assigned'}</span>{I.down}</button></div>
         <div className="f"><span>Project</span><button className="fv" disabled={!edit} aria-haspopup="listbox" onClick={e => { const a = e.currentTarget; menuProject(a, t.project_name || '', v => { if (v !== '__new__') void update(t, { p: v }); else newProjectBox(a, n => void update(t, { p: n })); }); }}><span>{t.project_name || 'No project'}</span>{I.down}</button></div>
         <div className="f col"><span>Due date{t.due_date ? ` · ${dshort(t.due_date)}` : ''}</span>
-          {edit ? DueSeg(t.due_date ?? null, v => void update(t, { due: v || null }), !!t.due_date) : <span>{t.due_date ? dshort(t.due_date) : 'No due date'}</span>}</div>
+          {edit ? DueSeg((t.half_day && t.due_date === T0 ? HALF : t.due_date ?? null), v => void update(t, { due: v || null }), !!t.due_date) : <span>{t.due_date ? dshort(t.due_date) : 'No due date'}</span>}</div>
       </div>
       <div className="sfoot">{edit ? <button className="btn danger" onClick={() => void remove(t)}>Delete task</button> : <span />}
         <button className="btn pri" onClick={() => { saveText(); setSheet(null); }}>Done</button></div>

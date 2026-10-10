@@ -13,6 +13,8 @@ export interface AssignedTask {
   project_id?: string | null;
   project_number?: number | null;
   due_date?: string | null;
+  /** Due today, to be finished within half a day (manager picked Half Day). */
+  half_day?: boolean;
   project_name?: string | null;
   status: TaskStatus;
   created: string;
@@ -79,6 +81,12 @@ export const assignedTaskService = {
   /** Manager edit of a task they created; every field is written (pass the current values for unchanged ones). employeeId null = back to unassigned. */
   async managerUpdate(taskId: string, f: { description: string; projectName: string; employeeId: string | null; dueDate: string | null; status: TaskStatus }): Promise<AssignedTask> {
     const { data, error } = await supabase.rpc('manager_update_task', { p_task_id: taskId, p_description: f.description.trim(), p_project_name: f.projectName.trim(), p_employee_id: f.employeeId, p_due_date: f.dueDate || null, p_status: f.status });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+  /** Marks a task the manager created as a half-day task (due today), or clears the mark. */
+  async setHalfDay(taskId: string, halfDay: boolean): Promise<AssignedTask> {
+    const { data, error } = await supabase.rpc('set_task_half_day', { p_task_id: taskId, p_half_day: halfDay });
     if (error) throw new Error(error.message);
     return data;
   },

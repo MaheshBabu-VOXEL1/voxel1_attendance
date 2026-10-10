@@ -18,6 +18,7 @@ export const changelog: ChangelogRelease[] = [
     date: '2026-10-10',
     title: 'Apply leave from the check-in card',
     entries: [
+      { type: 'feature', description: 'Manager add-task bar: the due-date buttons are now Half Day / Today / Tomorrow ("Day after" is gone). Half Day saves the task due today and marks it half day, so the board shows "Half day" instead of "Today", even inside the Today group. Changing the due date clears the mark. Needs migration 0083 (assigned_tasks.half_day and set_task_half_day).' },
       { type: 'improvement', description: 'Employee screen: the Leave balance card is gone. "Apply leave" now sits inside the check-in card under the status, and opens one Leave sheet with the balances, Leave type, From/To dates, Reason, the Apply leave button and upcoming leave requests. The Today/Tomorrow shortcuts and the half-day switch are no longer in the form.' },
     ],
   },
