@@ -19,6 +19,10 @@ export interface AssignedTask {
   worked_seconds?: number;
   /** When the current running stretch began; null while paused. */
   work_resumed_at?: string | null;
+  /** While Stuck: how much is done (0-100 %), why it is stuck, and since when. */
+  stuck_progress?: number | null;
+  stuck_reason?: string | null;
+  stuck_at?: string | null;
   project_name?: string | null;
   status: TaskStatus;
   created: string;
@@ -100,6 +104,12 @@ export const assignedTaskService = {
   },
   async createOwn(description: string, status: Exclude<TaskStatus, 'NOT_STARTED'>): Promise<AssignedTask> {
     const { data, error } = await supabase.rpc('create_own_task', { p_description: description.trim(), p_status: status });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+  /** Marks a task Stuck with the required note: how much is done (%) and why it is stuck. */
+  async markStuck(taskId: string, progress: number, reason: string): Promise<AssignedTask> {
+    const { data, error } = await supabase.rpc('mark_task_stuck', { p_task_id: taskId, p_progress: progress, p_reason: reason.trim() });
     if (error) throw new Error(error.message);
     return data;
   },

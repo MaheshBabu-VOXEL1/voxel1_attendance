@@ -4,10 +4,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import EmployeeDay from '../EmployeeDay';
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ login: vi.fn() }) }));
 vi.mock('../../services/supabase', async (original) => { const actual = await original<typeof import('../../services/supabase')>(); return { ...actual, supabase: { ...actual.supabase, rpc: vi.fn(async () => ({ data: false, error: null })) } }; });
-const mocks = vi.hoisted(() => ({ status: vi.fn(), leave: vi.fn(), refresh: vi.fn(), extra: [] as any[] }));
+const mocks = vi.hoisted(() => ({ status: vi.fn(), stuck: vi.fn(), leave: vi.fn(), refresh: vi.fn(), extra: [] as any[] }));
 vi.mock('../../context/ThemeContext', () => ({ useTheme: () => ({ darkMode: false }) }));
 vi.mock('../../context/SubscriptionContext', () => ({ useSubscription: () => ({ canPerformAction: () => true }) }));
-vi.mock('../../services/assignedTask.service', () => ({ assignedTaskService: { setStatus: mocks.status } }));
+vi.mock('../../services/assignedTask.service', () => ({ assignedTaskService: { setStatus: mocks.status, markStuck: mocks.stuck } }));
 vi.mock('../../services/employeeService', () => ({ employeeService: { applyForLeave: mocks.leave } }));
 vi.mock('../../hooks/useAssignedTasks', () => ({ useAssignedTasks: () => ({ loading: false, error: '', refresh: mocks.refresh, tasks: [{id:'task1',description:'Review model',project_name:'Vyoma',created:'2026-10-01T09:00:00Z',status:'START',completed_at:null}, {id:'task2',description:'Old drawing',status:'END',completed_at:'2020-01-01T10:00:00Z'}, ...mocks.extra] }) }));
 vi.mock('../../services/hrService', () => ({ hrService: {
@@ -96,5 +96,23 @@ describe('employee reference screen', () => {
     const late = screen.getByText('Late half day').closest('.task')!.querySelector('.half')!;
     expect(late.textContent).toMatch(/^Half day · overdue since /); expect(late).toHaveClass('late');
     expect(screen.getByText('Fresh half day').closest('.task')!.querySelector('.half')!.textContent).toBe('Half day · 4h 30m from Start');
+  });
+  it('asks how much is done and why when the employee taps Stuck', async () => {
+    render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
+    await screen.findByText('Checked in');
+    fireEvent.click(screen.getByText('Review model').closest('.task')!.querySelector('.seg button:nth-child(2)')!);
+    const save = await screen.findByRole('button', { name: 'Mark stuck' });
+    fireEvent.click(screen.getByRole('radio', { name: '25%' }));
+    fireEvent.change(screen.getByLabelText('Why is it stuck?'), { target: { value: 'Need site photos' } });
+    fireEvent.click(save);
+    await waitFor(() => expect(mocks.stuck).toHaveBeenCalledWith('task1', 25, 'Need site photos'));
+    expect(mocks.status).not.toHaveBeenCalled();
+    await screen.findByText('Marked stuck. Your manager can see why.');
+  });
+  it('shows the stuck note on a stuck task', async () => {
+    mocks.extra.splice(0, mocks.extra.length, {id:'task5',description:'Blocked drawing',project_name:'BD',status:'STUCK',stuck_progress:50,stuck_reason:'Waiting for client',completed_at:null});
+    render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
+    await screen.findByText('Checked in');
+    expect(screen.getByText('Blocked drawing').closest('.task')!.querySelector('.stuck-note')!.textContent).toBe('50% done · Waiting for client');
   });
 });

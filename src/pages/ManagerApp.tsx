@@ -13,6 +13,7 @@ import { halfDayLate, halfDayLabel } from '../utils/halfDay';
 import { punchTimeLabel } from '../utils/attendanceUtils';
 import './ManagerApp.css';
 import AccountModeSwitch from '../components/AccountModeSwitch';
+import StuckNoteDialog from '../components/tasks/StuckNoteDialog';
 
 /* Manager app: Tasks / Leaves / Calendar, built from the voxel1-manager.html design on live data. */
 
@@ -244,6 +245,10 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [text, setText] = useState('');
   const [adding, setAdding] = useState(false);
   const [groupBy, setGroupBy] = useState<Group>('date');
+  // Marking a task Stuck asks how much is done and why.
+  const [stuckFor, setStuckFor] = useState<AssignedTask | null>(null);
+  const [stuckErr, setStuckErr] = useState('');
+  const [stuckBusy, setStuckBusy] = useState(false);
   // Who checked in today, for the Person view's "No task" list.
   const [inToday, setInToday] = useState<Set<string> | null>(null);
   useEffect(() => {
@@ -327,6 +332,10 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const task = (id: string) => tasks.find(t => t.id === id);
 
   const update = async (t: AssignedTask, ch: Partial<{ who: string | null; due: string | null; s: TaskStatus; p: string; text: string }>, quiet = false) => {
+    if (ch.s === 'STUCK' && t.status !== 'STUCK' && Object.keys(ch).length === 1) {
+      if (!canEdit(t) && t.employee_id !== user.id) { say('Only the manager who created this task can change it'); return; }
+      setStuckErr(''); setStuckFor(t); return;
+    }
     if (!canEdit(t)) {
       // A task someone else gave you: you may still update its status.
       if (t.employee_id === user.id && ch.s && Object.keys(ch).length === 1) {
@@ -349,8 +358,21 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       const msg = 'who' in ch ? (next.employeeId ? `Assigned to ${empName(next.employeeId)}` : 'Moved to backlog')
         : 'due' in ch ? (next.dueDate ? `Due ${dueWord(half ? HALF : next.dueDate)}` : 'Due date removed')
         : ch.s ? ST[ch.s][0] : ch.p ? `Moved to ${ch.p}` : 'Saved';
-      say(msg, () => { void assignedTaskService.managerUpdate(t.id, prev).then(() => assignedTaskService.setHalfDay(t.id, !!t.half_day)).then(refresh).catch(fail); });
+      // Undo back to Stuck needs the note again: restore the earlier one.
+      const restoreStuck = prev.status === 'STUCK' && !!t.stuck_reason;
+      say(msg, () => { void assignedTaskService.managerUpdate(t.id, prev.status === 'STUCK' ? { ...prev, status: 'PROGRESS' } : prev)
+        .then(() => restoreStuck ? assignedTaskService.markStuck(t.id, t.stuck_progress ?? 0, t.stuck_reason!) : undefined)
+        .then(() => assignedTaskService.setHalfDay(t.id, !!t.half_day)).then(refresh).catch(fail); });
     } catch (e) { fail(e); }
+  };
+  const saveStuck = async (progress: number, reason: string) => {
+    if (!stuckFor || stuckBusy) return;
+    setStuckBusy(true); setStuckErr('');
+    try {
+      await assignedTaskService.markStuck(stuckFor.id, progress, reason); await refresh();
+      setStuckFor(null); say(`Stuck · ${progress}% done`);
+    } catch (e) { setStuckErr(e instanceof Error ? e.message : 'Could not save. Try again.'); }
+    finally { setStuckBusy(false); }
   };
   const remove = async (t: AssignedTask) => {
     if (!canEdit(t)) return;
@@ -424,6 +446,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       {sheet?.kind === 'account' && AccountSheet()}
       {sheet?.kind === 'person' && PersonSheet(sheet.id)}
     </div>
+    {stuckFor && <StuckNoteDialog title={stuckFor.description} busy={stuckBusy} error={stuckErr}
+      onCancel={() => setStuckFor(null)} onSave={(p, r) => void saveStuck(p, r)} />}
     <div className={`toast${toast ? ' show' : ''}`} role="status"><span>{toast?.msg}</span>
       {toast?.undo && <button onClick={() => { const u = toast.undo!; setToast(null); u(); }}>Undo</button>}</div>
   </div>;
@@ -495,7 +519,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     const giveTask = (id: string) => {
       setCpWho(id);
       const box = document.getElementById('addT') as HTMLInputElement | null;
-      box?.scrollIntoView({ behavior: 'smooth', block: 'center' }); box?.focus({ preventScroll: true });
+      box?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }); box?.focus({ preventScroll: true });
     };
 
     return <>
@@ -574,7 +598,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     if (isDone) bits.push(<span key="d" className="mp" style={{ color: 'var(--ok)' }}>Done {doneOn === T0 ? 'today' : doneOn ? short(doneOn) : ''}</span>);
     else if (hide !== 'due' || dueInfo?.c === 'over' || (!!t.half_day && !!dueInfo)) bits.push(<button key="d" className={`mb${dueInfo ? (dueInfo.c ? ` ${dueInfo.c}` : '') : ' ph'}`} disabled={!edit}
       onClick={e => dueBar(e.currentTarget, (t.half_day && t.due_date === T0 ? HALF : t.due_date ?? null), v => void update(t, { due: v || null }))}>{I.calS}{dueInfo ? dueInfo.x : 'Due date'}</button>);
-    if (t.status === 'STUCK') bits.push(<span key="s" className="mp sk">Stuck</span>);
+    if (t.status === 'STUCK') bits.push(<span key="s" className="mp sk">{t.stuck_reason ? `Stuck · ${t.stuck_progress ?? 0}% done` : 'Stuck'}</span>);
     if (t.self_created) bits.push(<span key="o" className="ro">Written by employee</span>);
 
     const ts = (e: React.TouchEvent) => { Object.assign(sw.current, { x0: e.touches[0].clientX, y0: e.touches[0].clientY, dx: 0, on: false, dead: !edit }); };
@@ -602,6 +626,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
           <button className="tt" onClick={() => { if (!swiped()) openTask(t.id); }}>{t.description}</button>
           <p className="task-attribution">{taskAttribution(t)}</p>
           <div className="mt">{bits.map((b, i) => <React.Fragment key={i}>{i > 0 && <span className="sep" aria-hidden="true">·</span>}{b}</React.Fragment>)}</div>
+          {t.status === 'STUCK' && t.stuck_reason && <p className="stuck-note">“{t.stuck_reason}”</p>}
         </div>
       </div>
     </div>;
@@ -628,6 +653,9 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         <div className="f col"><span>Due date{t.due_date ? ` · ${dshort(t.due_date)}` : ''}</span>
           {edit ? DueSeg((t.half_day && t.due_date === T0 ? HALF : t.due_date ?? null), v => void update(t, { due: v || null }), !!t.due_date) : <span>{t.due_date ? dshort(t.due_date) : 'No due date'}</span>}</div>
       </div>
+      {t.status === 'STUCK' && t.stuck_reason && <div className="stuck-note sheet-stuck"><b>Stuck · {t.stuck_progress ?? 0}% done</b>
+        {t.stuck_at && <> · since {new Date(t.stuck_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, {punchTimeLabel(t.stuck_at)}</>}
+        <br />“{t.stuck_reason}”</div>}
       <div className="sfoot">{edit ? <button className="btn danger" onClick={() => void remove(t)}>Delete task</button> : <span />}
         <button className="btn pri" onClick={() => { saveText(); setSheet(null); }}>Done</button></div>
     </>;

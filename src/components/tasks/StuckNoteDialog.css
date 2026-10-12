@@ -1,0 +1,21 @@
+/* Uses the colour tokens of the screen it opens in (.employee-day or .mgr). */
+.stuck-dlg{position:fixed;inset:0;margin:auto;height:fit-content;width:min(440px,calc(100% - 32px));max-height:calc(100% - 32px);overflow-y:auto;border:0;border-radius:16px;padding:18px 16px 16px;background:var(--surface,#fff);color:var(--ink,#15213A);box-shadow:0 20px 50px -12px rgba(21,33,58,.35)}
+.stuck-dlg::backdrop{background:rgba(15,23,38,.45)}
+.stuck-dlg h2{margin:0;font-size:17px;font-weight:700;color:var(--navy,#1C2B4B)}
+.stuck-task{margin:4px 0 0;font-size:13.5px;color:var(--muted,#5A6578);overflow-wrap:anywhere}
+.stuck-lab{display:block;margin:16px 0 8px;font-size:13px;font-weight:700;color:var(--muted,#5A6578)}
+.stuck-dlg .stuck-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--line-2,#D3DBE6);border-radius:10px;overflow:hidden}
+.stuck-dlg .stuck-steps button{height:44px;min-width:0;border:0;background:var(--surface,#fff);font-size:14px;font-weight:600;color:var(--muted,#5A6578);cursor:pointer}
+.stuck-dlg .stuck-steps button+button{border-left:1px solid var(--line-2,#D3DBE6)}
+.stuck-dlg .stuck-steps button[aria-checked="true"]{background:var(--tint,#E8EFF8);color:var(--steel,#2F5F92)}
+.stuck-dlg textarea{display:block;width:100%;box-sizing:border-box;border:1px solid var(--line-2,#D3DBE6);border-radius:10px;padding:10px 12px;background:var(--surface,#fff);color:inherit;font:inherit;font-size:16px;resize:vertical}
+.stuck-dlg textarea:focus{outline:none;border-color:var(--steel,#2F5F92)}
+.stuck-err{margin:10px 0 0;font-size:13px;font-weight:600;color:var(--bad,#A42A1F)}
+.stuck-acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.stuck-dlg .stuck-acts button{height:44px;padding:0 16px;border-radius:10px;font:inherit;font-size:14.5px;font-weight:600;cursor:pointer}
+.stuck-dlg .stuck-cancel{border:1px solid var(--line-2,#D3DBE6);background:var(--surface,#fff);color:var(--ink,#15213A)}
+.stuck-dlg .stuck-save{border:0;background:#B42318;color:#fff}
+.stuck-dlg .stuck-save:disabled{opacity:.45;cursor:default}
+/* The note shown under a stuck task */
+.stuck-note{margin-top:4px;font-size:12.5px;line-height:1.4;color:var(--bad,#A42A1F);overflow-wrap:anywhere}
+.stuck-note b{font-weight:700}

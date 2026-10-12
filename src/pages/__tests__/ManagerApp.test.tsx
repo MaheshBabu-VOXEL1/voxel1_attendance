@@ -41,13 +41,16 @@ vi.mock('../../services/calendar.service', () => ({ calendarService: {
 } }));
 vi.mock('../../services/assignedTask.service', async (orig) => {
   const real = await orig<typeof import('../../services/assignedTask.service')>();
-  return { ...real, assignedTaskService: { setStatus: vi.fn(async () => ({})), listModeSwitcherIds: vi.fn(async () => ['e3']), listProjects: vi.fn(async () => [{ id: 'p2', name: 'KAFD', project_number: 2 }]), createProject: vi.fn(async (n: string) => ({ id: 'p3', name: n, project_number: 3 })), assign: vi.fn(async () => ({ id: 'n1' })), createUnassigned: vi.fn(async () => ({ id: 'n2' })), managerUpdate: vi.fn(async () => ({})), setHalfDay: vi.fn(async () => ({})), managerDelete: vi.fn(async () => {}) } };
+  return { ...real, assignedTaskService: { setStatus: vi.fn(async () => ({})), listModeSwitcherIds: vi.fn(async () => ['e3']), listProjects: vi.fn(async () => [{ id: 'p2', name: 'KAFD', project_number: 2 }]), createProject: vi.fn(async (n: string) => ({ id: 'p3', name: n, project_number: 3 })), assign: vi.fn(async () => ({ id: 'n1' })), createUnassigned: vi.fn(async () => ({ id: 'n2' })), managerUpdate: vi.fn(async () => ({})), markStuck: vi.fn(async () => ({})), setHalfDay: vi.fn(async () => ({})), managerDelete: vi.fn(async () => {}) } };
 });
 
 const user = { id: 'mgr', name: 'Test Manager', role: 'MANAGER', email: 'tm@example.com' } as any;
 
 describe('manager app', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    HTMLDialogElement.prototype.showModal = function() { this.setAttribute('open', ''); };
+  });
 
   it('shows the actual assigner and recipient across the shared manager board', async () => {
     render(<ManagerApp user={user} />);
@@ -289,16 +292,35 @@ describe('manager app', () => {
   it('lets a manager update the status of a task someone else assigned to them', async () => {
     render(<ManagerApp user={{ id: 'e1', name: 'Divya Kallepalli', role: 'MANAGER' } as any} />);
     fireEvent.click(screen.getByRole('button', { name: 'Status: In progress. Change status' }));
-    fireEvent.click(screen.getByRole('option', { name: /Stuck/ }));
-    await waitFor(() => expect(assignedTaskService.setStatus).toHaveBeenCalledWith('t1', 'STUCK'));
+    fireEvent.click(screen.getByRole('option', { name: /Done/ }));
+    await waitFor(() => expect(assignedTaskService.setStatus).toHaveBeenCalledWith('t1', 'END'));
     expect(assignedTaskService.managerUpdate).not.toHaveBeenCalled();
   });
 
-  it('changes status to Stuck through the status menu', async () => {
+  it('asks how much is done and why before marking a task Stuck', async () => {
     render(<ManagerApp user={user} />);
     fireEvent.click(screen.getByRole('button', { name: 'Status: In progress. Change status' }));
     fireEvent.click(screen.getByRole('option', { name: /Stuck/ }));
-    await waitFor(() => expect(assignedTaskService.managerUpdate).toHaveBeenCalledWith('t1', expect.objectContaining({ status: 'STUCK', employeeId: 'e1', projectName: 'Vyoma' })));
+    const save = await screen.findByRole('button', { name: 'Mark stuck' });
+    expect(save).toBeDisabled();
+    fireEvent.click(screen.getByRole('radio', { name: '50%' }));
+    expect(save).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Why is it stuck?'), { target: { value: ' Waiting for level 3 drawings ' } });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    await waitFor(() => expect(assignedTaskService.markStuck).toHaveBeenCalledWith('t1', 50, 'Waiting for level 3 drawings'));
+    expect(assignedTaskService.managerUpdate).not.toHaveBeenCalled();
+  });
+
+  it('shows the stuck note under a stuck task', async () => {
+    const extra = { id: 's1', employee_id: 'e1', employee_name: 'Divya Kallepalli', assigned_by: 'mgr', manager_name: 'Test Manager', description: 'Basement drainage', project_name: 'Vyoma', due_date: today, status: 'STUCK', stuck_progress: 75, stuck_reason: 'Client has not sent levels', stuck_at: new Date().toISOString(), self_created: false, created: '2026-10-08T00:30:00Z' } as any;
+    tasks.push(extra);
+    try {
+      render(<ManagerApp user={user} />);
+      const row = screen.getByRole('button', { name: 'Basement drainage' }).closest('.trw')!;
+      expect(row.textContent).toContain('Stuck · 75% done');
+      expect(row.textContent).toContain('“Client has not sent levels”');
+    } finally { tasks.pop(); }
   });
 
   it('does not let the manager change an employee-written task', () => {
