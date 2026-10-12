@@ -15,6 +15,13 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-10-12',
+    title: 'Task progress per person',
+    entries: [
+      { type: 'feature', description: 'Manager board, Person view: each person shows done/total for today next to their name, e.g. "ABHINAY 1/4" = 1 finished today out of 4 (finished today + still open). The done number is green. People in the No task list who finished work today show "2 done today".' },
+    ],
+  },
+  {
     date: '2026-10-10',
     title: 'Apply leave from the check-in card',
     entries: [

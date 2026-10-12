@@ -442,6 +442,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       && (!q || `${t.description} ${t.project_name || ''} ${t.employee_name || ''} ${t.manager_name || ''}`.toLowerCase().includes(q.toLowerCase()));
     const open = tasks.filter(t => t.status !== 'END' && inF(t));
     const done = tasks.filter(t => t.status === 'END' && inF(t));
+    // Person view progress: tasks finished today out of today's work (finished today + still open).
+    const doneTodayBy = (id: string) => done.filter(t => t.employee_id === id && !!t.completed_at && ymd(new Date(t.completed_at)) === T0).length;
     const over = open.filter(t => (t.due_date && t.due_date < T0) || halfDayLate(t, now)).length, stuck = open.filter(t => t.status === 'STUCK').length;
     const byDue = (a: AssignedTask, b: AssignedTask) => (a.due_date || '9').localeCompare(b.due_date || '9') || b.created.localeCompare(a.created);
 
@@ -528,14 +530,16 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         <button className="ibtn" aria-label="Close search" style={{ width: 36, height: 36 }} onClick={() => { setSearchOn(false); setQ(''); }}>{I.cross}</button></div>}
       {tasksLoading ? <p className="loading" role="status">Loading tasks…</p> : <>
         {shown.map(g => <React.Fragment key={g.t}>
-          <div className={`sec${g.cls ? ` ${g.cls}` : ''}`}><h2>{g.who && dot(g.who)}{g.t}</h2><span>{g.note || g.l.length}</span></div>
+          <div className={`sec${g.cls ? ` ${g.cls}` : ''}`}><h2>{g.who && dot(g.who)}{g.t}</h2>{g.who ? (() => { const d = doneTodayBy(g.who), n = d + g.l.length;
+            return !n ? <span>{g.note || 0}</span> : <span className="prog" title={`${d} of ${n} done today`} aria-label={`${d} of ${n} done today`}>{g.note ? `${g.note} · ` : ''}<b>{d}</b>/{n}</span>; })()
+            : <span>{g.note || g.l.length}</span>}</div>
           {g.l.length > 0 && <div className="list">{g.l.map(t => <React.Fragment key={t.id}>{TaskRow(t, g.hide)}</React.Fragment>)}</div>}
         </React.Fragment>)}
         {free.length > 0 && <>
           <div className="sec free-h"><h2>No task</h2><span>{free.length}</span></div>
           <div className="list free">{free.map(m => <div className="free-r" key={m.id}>
             <span className="free-t"><span className="free-n">{dot(m.id)}<span>{m.id === user.id ? `${m.name} (me)` : m.name}</span></span>
-              {inToday && <span className={`free-s${inToday.has(m.id) ? ' in' : ''}`}>{inToday.has(m.id) ? 'Checked in' : 'Not checked in'}</span>}</span>
+              {inToday && <span className={`free-s${inToday.has(m.id) ? ' in' : ''}`}>{inToday.has(m.id) ? 'Checked in' : 'Not checked in'}{doneTodayBy(m.id) ? ` · ${doneTodayBy(m.id)} done today` : ''}</span>}</span>
             <button type="button" className="free-b" aria-label={`Assign a task to ${m.name}`} onClick={() => giveTask(m.id)}>Assign task</button>
           </div>)}</div>
         </>}

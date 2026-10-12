@@ -175,6 +175,22 @@ describe('manager app', () => {
     (hrService.getAttendance as any).mockResolvedValue([]);
   });
 
+  it('shows done-today / total next to each person in the Person view', async () => {
+    const extra = [
+      { id: 'd1', employee_id: 'e1', employee_name: 'Divya Kallepalli', assigned_by: 'mgr', manager_name: 'Test Manager', description: 'Finished today', project_name: 'Vyoma', status: 'END', completed_at: new Date().toISOString(), self_created: false, created: '2026-10-08T01:00:00Z' },
+      { id: 'd2', employee_id: 'e1', employee_name: 'Divya Kallepalli', assigned_by: 'mgr', manager_name: 'Test Manager', description: 'Finished last year', project_name: 'Vyoma', status: 'END', completed_at: '2025-01-01T10:00:00Z', self_created: false, created: '2025-01-01T01:00:00Z' },
+    ] as any[];
+    tasks.push(...extra);
+    try {
+      render(<ManagerApp user={user} />);
+      fireEvent.click(screen.getByRole('tab', { name: 'Person' }));
+      // Divya: 1 open (Review shaft sizes) + 1 finished today = 1/2; the one finished last year does not count.
+      expect(await screen.findByLabelText('1 of 2 done today')).toBeInTheDocument();
+      // Ravi: 1 open, none finished today.
+      expect(screen.getByLabelText('0 of 1 done today')).toBeInTheDocument();
+    } finally { tasks.splice(tasks.length - 2, 2); }
+  });
+
   it('lists everyone as assignees, including managers and the signed-in manager as (me)', async () => {
     render(<ManagerApp user={user} />);
     await waitFor(() => expect(assignedTaskService.listModeSwitcherIds).toHaveBeenCalled());
