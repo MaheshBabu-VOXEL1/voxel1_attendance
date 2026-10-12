@@ -16,8 +16,9 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-10-12',
-    title: 'Task progress per person',
+    title: 'Task progress per person; only Maruthi approves leave',
     entries: [
+      { type: 'breaking', description: 'Only Maruthi (9885229887) approves or rejects leave, for everyone including his own (migration 0085: is_leave_approver; leaves_update policy, guard_leave_update and enforce_leave_decider allow only him, plus Admin as backup). Kesari and the other account-switch members no longer decide leave: their Leaves tab lists pending requests as "Waiting for Maruthi" with "Only Maruthi can approve" and no Approve/Reject buttons or badge. Leave emails still go to the line manager.' },
       { type: 'feature', description: 'Manager board, Person view: each person shows done/total for today next to their name, e.g. "ABHINAY 1/4" = 1 finished today out of 4 (finished today + still open). The done number is green. People in the No task list who finished work today show "2 done today".' },
     ],
   },

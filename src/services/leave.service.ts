@@ -251,6 +251,14 @@ export const leaveService = {
     apiClient.notify();
   },
 
+  /** true for the one person who approves or rejects leave (Maruthi, migration 0085). */
+  async isLeaveApprover(): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+    const { data, error } = await supabase.rpc('is_leave_approver');
+    if (error) return false;
+    return data === true;
+  },
+
   async getLeaveBalance(employeeId: string): Promise<LeaveBalance> {
     const policy = await organizationService.getLeavePolicy();
     const defaults = policy?.defaults ?? { ANNUAL: 15, CASUAL: 10, SICK: 14 };

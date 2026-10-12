@@ -315,6 +315,7 @@ table.att{width:100%;border-collapse:collapse;font-size:13.5px}
 .pop,.sheet{overscroll-behavior:contain}
 /* Narrow phones: keep the filter row and the add-task row inside the screen. */
 @media (max-width:380px){ .tools .seg button{padding:0 9px} }
+.only-approver{flex:none;font-size:12px;font-weight:600;color:var(--faint)}
 .sec .prog{font-variant-numeric:tabular-nums}
 .sec .prog b{color:var(--ok);font-weight:700}
 .free-r{display:flex;align-items:center;gap:10px;min-height:52px;padding:6px 8px 6px 14px;border-top:1px solid var(--line)}

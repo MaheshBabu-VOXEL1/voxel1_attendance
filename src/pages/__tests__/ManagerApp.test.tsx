@@ -28,6 +28,7 @@ vi.mock('../../services/hrService', () => ({ hrService: {
     { id: 'l1', employeeId: 'e1', employeeName: 'Divya Kallepalli', lineManagerId: 'mgr', startDate: today, endDate: today, totalDays: 1, type: 'CASUAL_SICK', reason: 'Fever', status: 'PENDING_MANAGER', appliedDate: today },
   ]),
   getLeaveBalance: vi.fn(async () => ({ employeeId: 'e1', CASUAL_SICK: 5, PAID: 7 })),
+  isLeaveApprover: vi.fn(async () => true),
   getLeaveTypes: async () => [{ id: 'CASUAL_SICK', name: 'Casual & Sick Leave', color: '', hasBalance: true }, { id: 'PAID', name: 'Paid Leave', color: '', hasBalance: true }],
   getConfig: async () => ({ workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] }),
   getHolidays: vi.fn(async () => [{ id: 'h1', date: today, name: 'Company day', isGovernment: false, type: 'FESTIVAL' }]),
@@ -316,37 +317,36 @@ describe('manager app', () => {
     await waitFor(() => expect(hrService.updateLeaveStatus).toHaveBeenCalledWith('l1', 'APPROVED', '', 'MANAGER'));
   });
 
-  it('lets an account-switch member in Manager mode decide other people\'s leave but not their own', async () => {
+  it('lets Maruthi, the only leave approver, decide every leave including his own', async () => {
     vi.mocked(hrService.getLeaves).mockResolvedValue([
-      { id: 'l1', employeeId: 'e1', employeeName: 'Divya Kallepalli', lineManagerId: 'mgr', startDate: today, endDate: today, totalDays: 1, type: 'CASUAL_SICK', reason: 'Fever', status: 'PENDING_MANAGER', appliedDate: today },
-      { id: 'l2', employeeId: 'e3', employeeName: 'Maruthi', lineManagerId: 'mgr', startDate: today, endDate: today, totalDays: 1, type: 'CASUAL_SICK', reason: 'Trip', status: 'PENDING_MANAGER', appliedDate: today },
+      { id: 'l1', employeeId: 'e1', employeeName: 'Divya Kallepalli', lineManagerId: 'kesari', startDate: today, endDate: today, totalDays: 1, type: 'CASUAL_SICK', reason: 'Fever', status: 'PENDING_MANAGER', appliedDate: today },
+      { id: 'l2', employeeId: 'e3', employeeName: 'Maruthi', lineManagerId: 'kesari', startDate: today, endDate: today, totalDays: 1, type: 'CASUAL_SICK', reason: 'Trip', status: 'PENDING_MANAGER', appliedDate: today },
     ] as any);
     render(<ManagerApp user={{ id: 'e3', name: 'Maruthi', role: 'MANAGER' } as any} />);
     fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
-    expect(await screen.findByText('Divya Kallepalli', { selector: 'b' })).toBeInTheDocument();
-    expect(screen.queryByText('Maruthi', { selector: 'b' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
-    await waitFor(() => expect(hrService.updateLeaveStatus).toHaveBeenCalledWith('l1', 'APPROVED', '', 'MANAGER'));
+    expect(await screen.findByText('Maruthi', { selector: 'b' })).toBeInTheDocument();
+    expect(screen.getByText('Divya Kallepalli', { selector: 'b' })).toBeInTheDocument();
+    expect(screen.getByText('2 requests waiting for you')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Approve' })).toHaveLength(2);
+    fireEvent.click(screen.getByText('Maruthi', { selector: 'b' }).closest('.lv')!.querySelector('.btn.go')!);
+    await waitFor(() => expect(hrService.updateLeaveStatus).toHaveBeenCalledWith('l2', 'APPROVED', '', 'MANAGER'));
   });
 
-  it('shows the manager their own leave when they are their own line manager (Kesari)', async () => {
+  it('shows leave requests to other managers without Approve or Reject (only Maruthi decides)', async () => {
+    vi.mocked(hrService.isLeaveApprover).mockResolvedValue(false);
     vi.mocked(hrService.getLeaves).mockResolvedValue([
-      { id: 'l9', employeeId: 'mgr', employeeName: 'Test Manager', lineManagerId: 'mgr', startDate: today, endDate: today, totalDays: 1, type: 'CASUAL_SICK', reason: 'Personal', status: 'PENDING_MANAGER', appliedDate: today },
+      { id: 'l1', employeeId: 'e1', employeeName: 'Divya Kallepalli', lineManagerId: 'mgr', startDate: today, endDate: today, totalDays: 1, type: 'CASUAL_SICK', reason: 'Fever', status: 'PENDING_MANAGER', appliedDate: today },
     ] as any);
-    render(<ManagerApp user={user} />);
-    fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
-    expect(await screen.findByText('Test Manager', { selector: 'b' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
-    await waitFor(() => expect(hrService.updateLeaveStatus).toHaveBeenCalledWith('l9', 'APPROVED', '', 'MANAGER'));
-  });
-
-  it('does not show other managers\' leave queues to a manager who is not a switch member', async () => {
-    vi.mocked(hrService.getLeaves).mockResolvedValue([
-      { id: 'l1', employeeId: 'e1', employeeName: 'Divya Kallepalli', lineManagerId: 'someone-else', startDate: today, endDate: today, totalDays: 1, type: 'CASUAL_SICK', reason: 'Fever', status: 'PENDING_MANAGER', appliedDate: today },
-    ] as any);
-    render(<ManagerApp user={user} />);
-    fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
-    expect(await screen.findByText('All caught up')).toBeInTheDocument();
+    try {
+      render(<ManagerApp user={user} />);
+      fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
+      expect(await screen.findByText('Divya Kallepalli', { selector: 'b' })).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByText('Only Maruthi can approve')).toBeInTheDocument());
+      expect(screen.getByText('1 request waiting for Maruthi')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Reject' })).toBeNull();
+      expect(document.querySelector('.nb')).toBeNull();
+    } finally { vi.mocked(hrService.isLeaveApprover).mockResolvedValue(true); }
   });
 
   it('shows the calendar inside Attendance and adds an event from the month header', async () => {

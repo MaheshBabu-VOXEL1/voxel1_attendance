@@ -91,7 +91,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   // Everyone who can be given a task: all employees and managers, the signed-in manager included.
   const [people, setPeople] = useState<Employee[]>([]);
   // An account-switch member in Manager mode also decides other people's leave.
-  const [coDecider, setCoDecider] = useState(false);
+  // Only Maruthi (and Admin) approve or reject leave; everyone else sees requests without the buttons.
+  const [approver, setApprover] = useState(false);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<CustomLeaveType[]>(DEFAULT_LEAVE_TYPES);
   const [balances, setBalances] = useState<Record<string, LeaveBalance>>({});
@@ -134,11 +135,12 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     Promise.all([
       employeeService.getEmployees(), hrService.getLeaveTypes().catch(() => DEFAULT_LEAVE_TYPES), hrService.getConfig().catch(() => null),
       loadLeaves(), loadCalendar(), assignedTaskService.listModeSwitcherIds().catch(() => [] as string[]),
-    ]).then(([emps, types, cfg, , , switchers]) => {
+      hrService.isLeaveApprover().catch(() => false),
+    ]).then(([emps, types, cfg, , , switchers, isApprover]) => {
       if (!alive) return;
+      setApprover(isApprover);
       // Account-switch members stay assignable while they are in Manager mode.
       const sw = new Set(switchers);
-      setCoDecider(sw.has(user.id));
       const byName = (a: Employee, b: Employee) => (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' });
       setEmployees(emps.filter(e => (e.role === 'EMPLOYEE' || sw.has(e.id)) && e.status !== 'INACTIVE').sort(byName));
       setPeople(emps.filter(e => (e.role === 'EMPLOYEE' || e.role === 'MANAGER') && e.status !== 'INACTIVE').sort(byName));
@@ -373,8 +375,10 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const dueBar = (anchor: HTMLElement, cur: string | null, pick: (v: string) => void) => openPop({ anchor, kind: 'due', cur, pick });
 
   // ---------- render ----------
-  const pendingLeaves = leaves.filter(l => l.status === 'PENDING_MANAGER' && (l.lineManagerId === user.id || user.role === 'ADMIN' || (coDecider && l.employeeId !== user.id)))
-    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const canDecideLeave = approver || user.role === 'ADMIN';
+  const waitingLeaves = leaves.filter(l => l.status === 'PENDING_MANAGER').sort((a, b) => a.startDate.localeCompare(b.startDate));
+  // Only the approver gets the badge and the "waiting for you" count.
+  const pendingLeaves = canDecideLeave ? waitingLeaves : [];
 
   return <div className="mgr" data-theme={darkMode ? 'dark' : 'light'}>
     <header className="bar"><div className="bar-in">
@@ -643,11 +647,11 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       } catch (e) { fail(e); } finally { setBusy(''); }
     };
     return <>
-      <div className="ph"><div><h1>Leaves</h1><p>{pendingLeaves.length ? `${plural(pendingLeaves.length, 'request')} waiting for you` : 'All caught up'}</p></div></div>
+      <div className="ph"><div><h1>Leaves</h1><p>{!waitingLeaves.length ? 'All caught up' : canDecideLeave ? `${plural(waitingLeaves.length, 'request')} waiting for you` : `${plural(waitingLeaves.length, 'request')} waiting for Maruthi`}</p></div></div>
       {off.length > 0 && <><div className="sec" style={{ marginTop: 0 }}><h2>Off today</h2></div>
         <div className="off">{off.map(l => <div key={l.id}><span className="av sm">{ini(l.employeeName)}</span>{l.employeeName} <small>{typeName(l.type)}</small></div>)}</div></>}
-      <div className="sec"><h2>Waiting for you</h2><span>{pendingLeaves.length || ''}</span></div>
-      <div className="list">{pendingLeaves.length ? pendingLeaves.map(l => {
+      <div className="sec"><h2>{canDecideLeave ? 'Waiting for you' : 'Waiting for Maruthi'}</h2><span>{waitingLeaves.length || ''}</span></div>
+      <div className="list">{waitingLeaves.length ? waitingLeaves.map(l => {
         const days = l.totalDays || 0;
         const hasBal = leaveTypes.find(t => t.id === l.type)?.hasBalance ?? false;
         const bal = hasBal ? Number(balances[l.employeeId]?.[l.type] ?? 0) : null;
@@ -662,8 +666,9 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
           {l.reason && <p className="note">“{l.reason}”</p>}
           <div className="fl">{fl.map(([c, x], i) => <div key={i} className={c}>{c === 'ok' ? I.check : I.warn}<span>{x}</span></div>)}</div>
           <div className="lb"><small>{bal !== null ? `Balance ${bal} → ${Math.max(0, bal - days)} · ` : ''}applied {l.appliedDate?.slice(0, 10) === T0 ? 'today' : l.appliedDate ? short(l.appliedDate.slice(0, 10)) : ''}</small>
-            <div className="acts"><button className="btn" disabled={busy === l.id} onClick={() => void decide(l, 'REJECTED')}>Reject</button>
-              <button className="btn go" disabled={busy === l.id} onClick={() => void decide(l, 'APPROVED')}>Approve</button></div></div>
+            {canDecideLeave ? <div className="acts"><button className="btn" disabled={busy === l.id} onClick={() => void decide(l, 'REJECTED')}>Reject</button>
+              <button className="btn go" disabled={busy === l.id} onClick={() => void decide(l, 'APPROVED')}>Approve</button></div>
+              : <small className="only-approver">Only Maruthi can approve</small>}</div>
         </div>;
       }) : <div className="empty">No pending requests</div>}</div>
       <div className="sec"><h2>Recent decisions</h2></div>
