@@ -80,6 +80,21 @@ const buildAttendancePayload = (data: Attendance, orgId: string | undefined): an
   organization_id: orgId,
 });
 
+const inFlightCheckIns = new Map<string, Promise<void>>();
+
+/** True when the employee already has a check-in for this date that is not checked out. */
+async function hasOpenCheckIn(employeeId: string, date: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('attendance')
+    .select('id')
+    .eq('employee_id', employeeId)
+    .eq('date', date)
+    .is('check_out', null)
+    .limit(1);
+  if (error) throw error;
+  return !!data?.length;
+}
+
 // Supabase stores check_in/check_out as timestamptz (full ISO string).
 // The rest of the app expects HH:mm. Convert only when the value looks like
 // an ISO timestamp; leave bare HH:mm strings (legacy data) unchanged.
@@ -185,14 +200,26 @@ export const attendanceService = {
 
   async saveAttendance(data: Attendance) {
     if (!isSupabaseConfigured()) return;
+    // A double tap reuses the check-in already in flight instead of inserting twice.
+    const key = `${data.employeeId.trim()}|${data.date}`;
+    const pending = inFlightCheckIns.get(key);
+    if (pending) return pending;
+    const p = attendanceService.saveAttendanceOnce(data).finally(() => inFlightCheckIns.delete(key));
+    inFlightCheckIns.set(key, p);
+    return p;
+  },
+
+  async saveAttendanceOnce(data: Attendance) {
     const orgId = apiClient.getOrganizationId();
 
     const payload = buildAttendancePayload(data, orgId ?? undefined);
     try {
-      const { error } = await supabase
-        .from('attendance')
-        .insert(payload);
-      if (error) throw error;
+      if (!(await hasOpenCheckIn(payload.employee_id, data.date))) {
+        const { error } = await supabase
+          .from('attendance')
+          .insert(payload);
+        if (error) throw error;
+      }
     } catch (err: any) {
       const syncErr = classifySyncError(err);
       // A refusal (e.g. outside the office radius) would fail again on retry.
@@ -232,10 +259,13 @@ export const attendanceService = {
       try {
         const effectiveOrgId = entry.payload.organizationId || orgId;
         const pbPayload = buildAttendancePayload(entry.payload as Attendance, effectiveOrgId ?? undefined);
-        const { error } = await supabase
-          .from('attendance')
-          .insert(pbPayload);
-        if (error) throw error;
+        // A queued retry may already have landed (e.g. the first request timed out after the insert).
+        if (!(await hasOpenCheckIn(pbPayload.employee_id, entry.payload.date))) {
+          const { error } = await supabase
+            .from('attendance')
+            .insert(pbPayload);
+          if (error) throw error;
+        }
         checkInSyncQueue.markSuccess(entry.id);
         drained += 1;
       } catch (err: any) {

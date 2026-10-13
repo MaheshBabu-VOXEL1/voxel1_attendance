@@ -15,6 +15,14 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-10-13',
+    title: 'Attendance hours no longer double-counted; duplicate check-ins blocked',
+    entries: [
+      { type: 'fix', description: 'Manager Attendance hours: overlapping sessions on the same day (e.g. two open check-ins at 10:15 and 10:20) were each counted up to now, so 10:15 → 2:46 pm showed 8h 57m instead of 4h 31m. Sessions are now merged so no minute is counted twice; real breaks between sessions are still excluded.' },
+      { type: 'fix', description: 'Duplicate check-ins: a double tap now reuses the check-in already in progress, and both the normal check-in and the offline retry queue skip the insert when the employee already has an open check-in for that day (a retry after a timed-out request no longer creates a second row).' },
+    ],
+  },
+  {
     date: '2026-10-12',
     title: 'Task progress per person; only Maruthi approves leave; Stuck note',
     entries: [

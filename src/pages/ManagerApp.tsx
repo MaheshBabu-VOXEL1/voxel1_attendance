@@ -805,7 +805,14 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       const now = new Date(), nowM = now.getHours() * 60 + now.getMinutes();
       const open = rs.some(r => !r.checkOut), inM = toMin(rs[0].checkIn)!;
       const outM = open ? undefined : Math.max(...rs.map(r => toMin(r.checkOut) ?? 0));
-      const worked = rs.reduce((t, r) => { const a = toMin(r.checkIn)!, b = r.checkOut ? toMin(r.checkOut)! : d === T0 ? nowM : a; return t + Math.max(0, b - a); }, 0);
+      // Merge overlapping sessions (e.g. duplicate open check-ins) so the same minutes are never counted twice.
+      let worked = 0, endM = -1;
+      for (const r of rs) {
+        const a = toMin(r.checkIn)!, b = r.checkOut ? toMin(r.checkOut)! : d === T0 ? nowM : a;
+        const s = Math.max(a, endM);
+        if (b > s) worked += b - s;
+        endM = Math.max(endM, b);
+      }
       const late = rs.some(r => r.status === 'LATE') || inM > lateAfter();
       const k = open && d === T0 ? 'in' : 'done';
       return { k, inM, outM, late, worked, short: k === 'done' && !open && worked < 480 };

@@ -118,6 +118,22 @@ describe('manager app', () => {
     await waitFor(() => expect(hrService.getAttendance).toHaveBeenCalledWith(expect.objectContaining({ employeeId: 'e1' })));
   });
 
+  it('does not double-count hours when a person has two open check-ins today', async () => {
+    const now = new Date(), nowM = now.getHours() * 60 + now.getMinutes();
+    if (nowM < 70) return; // too close to midnight to place both check-ins today
+    const at = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    vi.mocked(hrService.getHolidays).mockResolvedValueOnce([]);
+    vi.mocked(hrService.getAttendance).mockImplementation(async (o: any) => o?.employeeId ? [] : [
+      { id: 'a1', employeeId: 'e1', date: today, checkIn: at(nowM - 60), status: 'LATE' } as any,
+      { id: 'a2', employeeId: 'e1', date: today, checkIn: at(nowM - 55), status: 'LATE' } as any,
+    ]);
+    render(<ManagerApp user={user} onNavigate={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));
+    const table = await screen.findByRole('table');
+    const divya = within(table).getAllByRole('row').find(r => r.textContent!.includes('Divya Kallepalli'))!;
+    expect(divya.textContent).toMatch(/1h 0[01]m/); // not 1h 55m
+  });
+
   it('moves to the previous day from the attendance table', async () => {
     render(<ManagerApp user={user} onNavigate={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));
