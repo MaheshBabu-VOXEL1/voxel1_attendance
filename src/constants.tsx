@@ -127,7 +127,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   currency: "USD",
   dateFormat: "DD/MM/YYYY",
   workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Sunday"],
-  officeStartTime: "09:00",
+  officeStartTime: "10:00",
   officeEndTime: "18:00",
   lateGracePeriod: 5,
   earlyOutGracePeriod: 15,

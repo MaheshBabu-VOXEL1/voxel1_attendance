@@ -98,7 +98,7 @@ describe('manager app', () => {
   it('shows the attendance table with KPIs, late check-ins and who is not in', async () => {
     vi.mocked(hrService.getHolidays).mockResolvedValueOnce([]);
     vi.mocked(hrService.getAttendance).mockImplementation(async (o: any) => o?.employeeId ? [] : [
-      { id: 'a1', employeeId: 'e1', date: today, checkIn: '09:40', status: 'PRESENT' } as any,
+      { id: 'a1', employeeId: 'e1', date: today, checkIn: '10:40', status: 'PRESENT' } as any,
     ]);
     render(<ManagerApp user={user} onNavigate={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));
@@ -107,12 +107,12 @@ describe('manager app', () => {
     expect(rows[0].textContent).toBe('Team memberInOutHours');
     const divya = rows.find(r => r.textContent!.includes('Divya Kallepalli'))!;
     expect(divya.textContent).toContain('Late · working');
-    expect(divya.textContent).toContain('9:40');
+    expect(divya.textContent).toContain('10:40');
     expect(rows.find(r => r.textContent!.includes('Ravi'))!.textContent).toContain('Not in yet');
     expect(table.textContent).not.toContain('Test Manager');
     const kpis = document.querySelector('.kpis')!.textContent!;
     expect(kpis).toContain('1/5Present'); expect(kpis).toContain('1Late'); expect(kpis).toContain('4Not in');
-    expect(screen.getByText(/Late = checked in after 9:15 am/)).toBeInTheDocument();
+    expect(screen.getByText(/Late = checked in after 10:15 am/)).toBeInTheDocument();
     fireEvent.click(divya);
     expect(await screen.findByText(/last 10 working days/)).toBeInTheDocument();
     await waitFor(() => expect(hrService.getAttendance).toHaveBeenCalledWith(expect.objectContaining({ employeeId: 'e1' })));

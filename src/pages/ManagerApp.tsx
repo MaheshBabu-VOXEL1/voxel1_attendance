@@ -103,7 +103,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [loadError, setLoadError] = useState('');
   const [attendance, setAttendance] = useState<Attendance | undefined>();
   const [attReady, setAttReady] = useState(false);
-  const [officeStart, setOfficeStart] = useState('09:00');
+  const [officeStart, setOfficeStart] = useState('10:00');
   const [lateGrace, setLateGrace] = useState(15);
   const [dayRows, setDayRows] = useState<Attendance[]>([]);
   const [dayLoading, setDayLoading] = useState(false);
