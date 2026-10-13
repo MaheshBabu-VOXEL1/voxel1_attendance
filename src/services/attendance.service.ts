@@ -95,6 +95,22 @@ async function hasOpenCheckIn(employeeId: string, date: string): Promise<boolean
   return !!data?.length;
 }
 
+/**
+ * True when a queued (offline) check-in is already covered by a row the person
+ * created after it: one still open, or one checked out at/after the queued time.
+ * Without this, a check-in that synced late re-opened a day already checked out.
+ */
+async function isQueuedCheckInStale(employeeId: string, date: string, checkInIso: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('attendance')
+    .select('check_out')
+    .eq('employee_id', employeeId)
+    .eq('date', date);
+  if (error) throw error;
+  const at = new Date(checkInIso).getTime();
+  return (data || []).some(r => !r.check_out || new Date(r.check_out).getTime() >= at);
+}
+
 // Supabase stores check_in/check_out as timestamptz (full ISO string).
 // The rest of the app expects HH:mm. Convert only when the value looks like
 // an ISO timestamp; leave bare HH:mm strings (legacy data) unchanged.
@@ -260,7 +276,7 @@ export const attendanceService = {
         const effectiveOrgId = entry.payload.organizationId || orgId;
         const pbPayload = buildAttendancePayload(entry.payload as Attendance, effectiveOrgId ?? undefined);
         // A queued retry may already have landed (e.g. the first request timed out after the insert).
-        if (!(await hasOpenCheckIn(pbPayload.employee_id, entry.payload.date))) {
+        if (!(await isQueuedCheckInStale(pbPayload.employee_id, entry.payload.date, pbPayload.check_in))) {
           const { error } = await supabase
             .from('attendance')
             .insert(pbPayload);

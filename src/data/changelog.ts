@@ -20,6 +20,7 @@ export const changelog: ChangelogRelease[] = [
     entries: [
       { type: 'fix', description: 'Manager Attendance hours: overlapping sessions on the same day (e.g. two open check-ins at 10:15 and 10:20) were each counted up to now, so 10:15 → 2:46 pm showed 8h 57m instead of 4h 31m. Sessions are now merged so no minute is counted twice; real breaks between sessions are still excluded.' },
       { type: 'fix', description: 'Duplicate check-ins: a double tap now reuses the check-in already in progress, and both the normal check-in and the offline retry queue skip the insert when the employee already has an open check-in for that day (a retry after a timed-out request no longer creates a second row).' },
+      { type: 'fix', description: 'Offline check-in that syncs late: if the person checked in again and even checked out before the queued check-in reached the server, the queued one is now dropped instead of re-opening the day. After a failed check-in or check-out the screen re-reads attendance so the button shows the real state.' },
     ],
   },
   {

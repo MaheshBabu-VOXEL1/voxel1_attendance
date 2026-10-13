@@ -127,6 +127,8 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
     } catch (err: any) {
       console.error(err);
       setStatus('idle');
+      // The punch may have saved even though the reply was lost; re-read so the button shows the real state.
+      refreshData();
       // The database repeats the office-radius check (migration 0049).
       if (String(err?.message || '').includes('OUTSIDE_OFFICE')) {
         showToast("You are outside your office's allowed area. Move closer and try again.", "warning");
