@@ -18,6 +18,7 @@ export const changelog: ChangelogRelease[] = [
     date: '2026-10-15',
     title: 'Task priority, manager control of deadlines, more task filters',
     entries: [
+      { type: 'improvement', description: 'Employee My Tasks cards now show each task due date beside its assigned date, with Due today and Overdue labels for open tasks. Tasks without a deadline say No due date.' },
       { type: 'feature', description: 'Employees can tap the eye beside a task project to read its earlier Done and Stuck comments in a mobile-friendly sheet. Completing a task now requires a short handover note; Stuck notes are saved in the same history so a new assignee can see what was done and where work stopped (migration 0090).' },
       { type: 'feature', description: 'Task priority: every task is High, Medium or Low (default Medium). The Manager add-task bar has a Priority picker; each open task shows a HIGH / MEDIUM / LOW tag, and every group lists High first, then the earliest deadline. The employee My Tasks list shows the tag and puts High on top.' },
       { type: 'feature', description: 'Any manager (Manager mode included) or Admin can now change the priority and due date of any task on the shared board, not only tasks they created; tap the tag or the due date on the row, or use the task sheet. Every move of an existing deadline is counted and the sheet shows "Deadline moved 2× · last by Maruthi". Swipe left (change date) works on every task.' },
