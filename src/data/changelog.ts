@@ -18,6 +18,7 @@ export const changelog: ChangelogRelease[] = [
     date: '2026-10-15',
     title: 'Task priority, manager control of deadlines, more task filters',
     entries: [
+      { type: 'fix', description: 'Employee task cards now use the full card width for project, status, description, dates and a full-width action row, so task text and buttons no longer squeeze each other on phones.' },
       { type: 'improvement', description: 'Employee My Tasks cards now show each task due date beside its assigned date, with Due today and Overdue labels for open tasks. Tasks without a deadline say No due date.' },
       { type: 'feature', description: 'Employees can tap the eye beside a task project to read its earlier Done and Stuck comments in a mobile-friendly sheet. Completing a task now requires a short handover note; Stuck notes are saved in the same history so a new assignee can see what was done and where work stopped (migration 0090).' },
       { type: 'feature', description: 'Task priority: every task is High, Medium or Low (default Medium). The Manager add-task bar has a Priority picker; each open task shows a HIGH / MEDIUM / LOW tag, and every group lists High first, then the earliest deadline. The employee My Tasks list shows the tag and puts High on top.' },
