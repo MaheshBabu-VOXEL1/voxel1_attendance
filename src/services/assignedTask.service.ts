@@ -49,6 +49,15 @@ export const statusLabel: Record<TaskStatus, string> = {
   NOT_STARTED: 'Not started', START: 'Started', PROGRESS: 'In progress', STUCK: 'Stuck', END: 'Completed',
 };
 export interface TaskProject { id: string; name: string; project_number: number }
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  author_name: string;
+  kind: 'STUCK' | 'DONE';
+  body: string;
+  progress: number | null;
+  created_at: string;
+}
 export const assignedTaskService = {
   /** Account-switch members who can be assigned tasks even while in Manager mode. */
   async listModeSwitcherIds(): Promise<string[]> {
@@ -129,6 +138,16 @@ export const assignedTaskService = {
   /** Marks a task Stuck with the required note: how much is done (%) and why it is stuck. */
   async markStuck(taskId: string, progress: number, reason: string): Promise<AssignedTask> {
     const { data, error } = await supabase.rpc('mark_task_stuck', { p_task_id: taskId, p_progress: progress, p_reason: reason.trim() });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+  async listComments(taskId: string): Promise<TaskComment[]> {
+    const { data, error } = await supabase.from('task_comments').select('*').eq('task_id', taskId).order('created_at', { ascending: false }).order('id', { ascending: false });
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+  async completeWithNote(taskId: string, note: string): Promise<AssignedTask> {
+    const { data, error } = await supabase.rpc('complete_assigned_task', { p_task_id: taskId, p_note: note.trim() });
     if (error) throw new Error(error.message);
     return data;
   },

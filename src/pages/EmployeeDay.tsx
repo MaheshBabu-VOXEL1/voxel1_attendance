@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Search, X } from 'lucide-react';
+import { Check, ChevronDown, Eye, Search, X } from 'lucide-react';
 import { hrService } from '../services/hrService';
 import { employeeService } from '../services/employeeService';
 import { assignedTaskService, AssignedTask, TaskStatus, priorityLabel, priorityOf, priorityRank } from '../services/assignedTask.service';
@@ -14,6 +14,8 @@ import { useSubscription } from '../context/SubscriptionContext';
 import './EmployeeDay.css';
 import AccountModeSwitch from '../components/AccountModeSwitch';
 import StuckNoteDialog from '../components/tasks/StuckNoteDialog';
+import TaskCommentsDialog from '../components/tasks/TaskCommentsDialog';
+import DoneNoteDialog from '../components/tasks/DoneNoteDialog';
 
 const date = (s: string) => new Date(`${s}T12:00:00`);
 const short = (s: string) => date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -36,6 +38,9 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
   // Marking a task Stuck asks how much is done and why (the manager plans the next day from it).
   const [stuckFor, setStuckFor] = useState<AssignedTask | null>(null);
   const [stuckErr, setStuckErr] = useState('');
+  const [commentsFor, setCommentsFor] = useState<AssignedTask | null>(null);
+  const [doneFor, setDoneFor] = useState<AssignedTask | null>(null);
+  const [doneErr, setDoneErr] = useState('');
   const [workingDays, setWorkingDays] = useState<string[]>([]);
   const [holidays, setHolidays] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
@@ -141,6 +146,15 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
     } catch (e) { setStuckErr(e instanceof Error ? e.message : 'Could not save. Try again.'); }
     finally { setBusy(''); }
   };
+  const saveDone = async (note: string) => {
+    if (!doneFor || busy || !canWrite) return;
+    setBusy(doneFor.id); setDoneErr('');
+    try {
+      await assignedTaskService.completeWithNote(doneFor.id, note); await refresh();
+      setDoneFor(null); setUndo(null); setMessage('Marked done. Your comment was saved.');
+    } catch (e) { setDoneErr(e instanceof Error ? e.message : 'Could not save. Try again.'); }
+    finally { setBusy(''); }
+  };
   const doneToday = (t: AssignedTask) => t.status === 'END' && !!t.completed_at && ymd(new Date(t.completed_at)) === today;
   const old = (t: AssignedTask) => t.status === 'END' && !doneToday(t);
   // Open tasks first, High priority on top; finished ones keep their order below.
@@ -162,7 +176,7 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
       <div className="list" aria-live="polite">{taskError ? <p className="empty" role="alert">{taskError}</p> : loading ? <p className="empty">Loading tasks…</p> : !visible.length ? <p className="empty">{query ? `No tasks match “${query}”` : 'All clear for today'}</p> : visible.map(t => {
         const done = t.status === 'END', progress = t.status === 'START' || t.status === 'PROGRESS', stuck = t.status === 'STUCK';
         const half = halfDayLabel(t, now);
-        return <div className={`task${done ? ' done' : ''}`} key={t.id}><div className="t"><div className="meta">{!done && <span className={`prio ${priorityOf(t).toLowerCase()}`}>{priorityLabel[priorityOf(t)]}</span>}<span className="p">Project: {t.project_name || 'No project'}</span><span className={`d${stuck ? ' stuck' : progress ? ' prog' : ''}`}>{done ? doneToday(t) ? 'Done today' : t.completed_at ? `Done ${short(ymd(new Date(t.completed_at)))}` : 'Done' : stuck ? 'Stuck' : progress ? 'In progress' : 'Not started'}</span></div><div className="ttl">{t.description}</div>{half && <div className={`half${half.late ? ' late' : ''}`}>{half.text}</div>}{stuck && t.stuck_reason && <div className="stuck-note"><b>{t.stuck_progress ?? 0}% done</b> · {t.stuck_reason}</div>}{t.created && <div className="assigned-date">Assigned <time dateTime={t.created}>{new Date(t.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</time></div>}</div>{done ? <div className="donebox"><span className="ok"><Check size={13} />Done</span><button disabled={!!busy || !canWrite} onClick={() => updateTask(t,'START')}>Reopen</button></div> : <div className="seg"><button className={progress ? 'on' : ''} disabled={!!busy || !canWrite} onClick={() => updateTask(t,progress ? 'NOT_STARTED' : 'START')}>{progress ? 'Pause' : 'Start'}</button><button className={stuck ? 'on stuck' : ''} aria-pressed={stuck} disabled={!!busy || !canWrite} onClick={() => { if (stuck) void updateTask(t, 'PROGRESS'); else { setStuckErr(''); setStuckFor(t); } }}>Stuck</button><button disabled={!!busy || !canWrite} onClick={() => updateTask(t,'END')}>Done</button></div>}</div>;
+        return <div className={`task${done ? ' done' : ''}`} key={t.id}><div className="t"><div className="meta">{!done && <span className={`prio ${priorityOf(t).toLowerCase()}`}>{priorityLabel[priorityOf(t)]}</span>}<span className="project-with-comments"><span className="p">Project: {t.project_name || 'No project'}</span><button type="button" className="task-comments-eye" aria-label={`View previous comments for ${t.description}`} onClick={() => setCommentsFor(t)}><Eye size={18} aria-hidden="true" /></button></span><span className={`d${stuck ? ' stuck' : progress ? ' prog' : ''}`}>{done ? doneToday(t) ? 'Done today' : t.completed_at ? `Done ${short(ymd(new Date(t.completed_at)))}` : 'Done' : stuck ? 'Stuck' : progress ? 'In progress' : 'Not started'}</span></div><div className="ttl">{t.description}</div>{half && <div className={`half${half.late ? ' late' : ''}`}>{half.text}</div>}{stuck && t.stuck_reason && <div className="stuck-note"><b>{t.stuck_progress ?? 0}% done</b> · {t.stuck_reason}</div>}{t.created && <div className="assigned-date">Assigned <time dateTime={t.created}>{new Date(t.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</time></div>}</div>{done ? <div className="donebox"><span className="ok"><Check size={13} />Done</span><button disabled={!!busy || !canWrite} onClick={() => updateTask(t,'START')}>Reopen</button></div> : <div className="seg"><button className={progress ? 'on' : ''} disabled={!!busy || !canWrite} onClick={() => updateTask(t,progress ? 'NOT_STARTED' : 'START')}>{progress ? 'Pause' : 'Start'}</button><button className={stuck ? 'on stuck' : ''} aria-pressed={stuck} disabled={!!busy || !canWrite} onClick={() => { if (stuck) void updateTask(t, 'PROGRESS'); else { setStuckErr(''); setStuckFor(t); } }}>Stuck</button><button disabled={!!busy || !canWrite} onClick={() => { setDoneErr(''); setDoneFor(t); }}>Done</button></div>}</div>;
       })}</div>
       {!query.trim() && tasks.some(old) && <button className={`more${history ? ' open' : ''}`} aria-expanded={history} onClick={() => setHistory(!history)}>{history ? 'Hide finished tasks' : `Show more (${tasks.filter(old).length} finished earlier)`}<ChevronDown size={16}/></button>}
     </main>
@@ -177,6 +191,9 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
     </dialog>}
     {stuckFor && <StuckNoteDialog title={stuckFor.description} busy={busy === stuckFor.id} error={stuckErr}
       onCancel={() => setStuckFor(null)} onSave={(p, r) => void saveStuck(p, r)} />}
+    {doneFor && <DoneNoteDialog title={doneFor.description} busy={busy === doneFor.id} error={doneErr}
+      onCancel={() => setDoneFor(null)} onSave={note => void saveDone(note)} />}
+    {commentsFor && <TaskCommentsDialog task={commentsFor} onClose={() => setCommentsFor(null)} />}
     {message && <div className="toast show" role="status"><span>{message}</span>{undo && <button disabled={!!busy} onClick={() => updateTask(undo, undo.status === 'STUCK' ? 'PROGRESS' : undo.status, true)}>Undo</button>}</div>}
   </div>;
 }
