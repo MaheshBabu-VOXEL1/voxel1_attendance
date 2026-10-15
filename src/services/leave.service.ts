@@ -4,6 +4,9 @@ import { apiClient, dedupe } from './api.client';
 import { LeaveRequest, LeaveBalance } from '../types';
 import { organizationService } from './organization.service';
 
+export interface UnpaidLeaveUsage { employeeId: string; name: string; used: number; limit: number | null; ownLimit: boolean }
+export interface UnpaidLeaveOverview { year: number; defaultLimit: number | null; canEdit: boolean; people: UnpaidLeaveUsage[] }
+
 let cachedLeaves: LeaveRequest[] | null = null;
 let leaveCacheTimestamp = 0;
 const LEAVE_CACHE_TTL = 2 * 60 * 1000;
@@ -108,7 +111,11 @@ export const leaveService = {
     };
 
     const { data: inserted, error } = await supabase.from('leaves').insert(payload).select('id').single();
-    if (error) throw new Error(`Failed to create record: ${error.message}`);
+    if (error) {
+      // Over the unpaid leave limit (migration 0091): show the database's plain message.
+      const over = /UNPAID_LIMIT:\s*(.*)/.exec(error.message);
+      throw new Error(over ? over[1] : `Failed to create record: ${error.message}`);
+    }
     leaveService.clearCache();
     apiClient.notify();
 
@@ -257,6 +264,27 @@ export const leaveService = {
     const { data, error } = await supabase.rpc('is_leave_approver');
     if (error) return false;
     return data === true;
+  },
+
+  /** Unpaid leave this year: everyone's limit, who may change limits, and per person used / limit (migration 0091). */
+  async getUnpaidLeaveOverview(): Promise<UnpaidLeaveOverview> {
+    const { data, error } = await supabase.rpc('unpaid_leave_overview');
+    if (error) throw new Error(error.message);
+    const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+    return {
+      year: Number(data?.year) || new Date().getFullYear(),
+      defaultLimit: num(data?.default_limit),
+      canEdit: data?.can_edit === true,
+      people: (data?.people || []).map((p: any) => ({
+        employeeId: p.employee_id, name: p.name || '', used: Number(p.used) || 0, limit: num(p.limit_days), ownLimit: p.own_limit === true,
+      })),
+    };
+  },
+
+  /** Maruthi or Admin: employeeId null = everyone's limit; limit null = remove it. */
+  async setUnpaidLeaveLimit(employeeId: string | null, limit: number | null): Promise<void> {
+    const { error } = await supabase.rpc('set_unpaid_leave_limit', { p_employee_id: employeeId, p_limit: limit });
+    if (error) throw new Error(error.message);
   },
 
   async getLeaveBalance(employeeId: string): Promise<LeaveBalance> {

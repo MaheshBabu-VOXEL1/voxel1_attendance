@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import EmployeeDay from '../EmployeeDay';
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ login: vi.fn() }) }));
 vi.mock('../../services/supabase', async (original) => { const actual = await original<typeof import('../../services/supabase')>(); return { ...actual, supabase: { ...actual.supabase, rpc: vi.fn(async () => ({ data: false, error: null })) } }; });
-const mocks = vi.hoisted(() => ({ status: vi.fn(), stuck: vi.fn(), leave: vi.fn(), refresh: vi.fn(), extra: [] as any[] }));
+const mocks = vi.hoisted(() => ({ status: vi.fn(), stuck: vi.fn(), leave: vi.fn(), refresh: vi.fn(), extra: [] as any[], unpaid: null as any }));
 vi.mock('../../context/ThemeContext', () => ({ useTheme: () => ({ darkMode: false }) }));
 vi.mock('../../context/SubscriptionContext', () => ({ useSubscription: () => ({ canPerformAction: () => true }) }));
 vi.mock('../../services/assignedTask.service', async (original) => ({ ...(await original<typeof import('../../services/assignedTask.service')>()), assignedTaskService: { setStatus: mocks.status, markStuck: mocks.stuck } }));
@@ -16,10 +16,11 @@ vi.mock('../../services/hrService', () => ({ hrService: {
   getActiveAttendance: async () => ({checkIn:'09:00'}), getAttendance: async () => [],
   getConfig: async () => ({workingDays:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']}),
   resolveShiftForEmployee: async () => null, getHolidays: async () => [],
+  getUnpaidLeaveOverview: async () => { if (!mocks.unpaid) throw new Error('missing'); return mocks.unpaid; },
 } }));
 describe('employee reference screen', () => {
   beforeEach(() => {
-    vi.clearAllMocks(); mocks.extra.length = 0;
+    vi.clearAllMocks(); mocks.extra.length = 0; mocks.unpaid = null;
     HTMLDialogElement.prototype.showModal = function() { this.setAttribute('open',''); };
     HTMLDialogElement.prototype.close = function() { this.removeAttribute('open'); };
   });
@@ -114,5 +115,29 @@ describe('employee reference screen', () => {
     render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
     await screen.findByText('Checked in');
     expect(screen.getByText('Blocked drawing').closest('.task')!.querySelector('.stuck-note')!.textContent).toBe('50% done · Waiting for client');
+  });
+  it('offers Unpaid leave with the yearly count and blocks a request over the limit Maruthi set', async () => {
+    mocks.unpaid = { year: 2026, defaultLimit: 9, canEdit: false, people: [{ employeeId: 'me', name: 'Me', used: 8, limit: 9, ownLimit: false }] };
+    render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
+    await screen.findByText('Checked in'); fireEvent.click(screen.getByText('Apply leave'));
+    const bal = document.querySelector('.sheet .bal')!;
+    await waitFor(() => expect(bal.textContent).toContain('Unpaid used'));
+    expect(bal.querySelector('.unpaid')!.textContent).toBe('8/9Unpaid used');
+    fireEvent.click(screen.getByRole('radio', {name:'Unpaid'}));
+    const iso = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+    fireEvent.change(screen.getByLabelText('From'), {target:{value:iso(3)}});
+    expect(document.querySelector('.sheet .msg')!.textContent).toContain('0 unpaid left this year after');
+    fireEvent.change(screen.getByLabelText('To'), {target:{value:iso(4)}});
+    expect(screen.getByRole('alert').textContent).toBe('Only 1 unpaid day left this year. Ask Maruthi to raise your limit.');
+  });
+  it('counts unpaid days without a limit when none is set', async () => {
+    mocks.unpaid = { year: 2026, defaultLimit: null, canEdit: false, people: [{ employeeId: 'me', name: 'Me', used: 2, limit: null, ownLimit: false }] };
+    render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
+    await screen.findByText('Checked in'); fireEvent.click(screen.getByText('Apply leave'));
+    await waitFor(() => expect(document.querySelector('.sheet .bal .unpaid')!.textContent).toBe('2Unpaid used'));
+    fireEvent.click(screen.getByRole('radio', {name:'Unpaid'}));
+    const d = new Date(); d.setDate(d.getDate() + 3);
+    fireEvent.change(screen.getByLabelText('From'), {target:{value:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}});
+    expect(document.querySelector('.sheet .msg')!.textContent).toContain('unpaid, 3 used this year');
   });
 });

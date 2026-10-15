@@ -44,6 +44,8 @@ export const hrService = {
   updateLeaveStatus: leaveService.updateLeaveStatus,
   getLeaveBalance: leaveService.getLeaveBalance,
   isLeaveApprover: leaveService.isLeaveApprover,
+  getUnpaidLeaveOverview: leaveService.getUnpaidLeaveOverview,
+  setUnpaidLeaveLimit: leaveService.setUnpaidLeaveLimit,
   adminCreateLeave: leaveService.adminCreateLeave,
   adminUpdateLeave: leaveService.adminUpdateLeave,
   adminDeleteLeave: leaveService.adminDeleteLeave,

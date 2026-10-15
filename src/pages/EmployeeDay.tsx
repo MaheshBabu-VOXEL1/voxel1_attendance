@@ -5,6 +5,7 @@ import { employeeService } from '../services/employeeService';
 import { assignedTaskService, AssignedTask, TaskStatus, priorityLabel, priorityOf, priorityRank } from '../services/assignedTask.service';
 import { useAssignedTasks } from '../hooks/useAssignedTasks';
 import { Attendance, CustomLeaveType, LeaveBalance, LeaveRequest } from '../types';
+import type { UnpaidLeaveUsage } from '../services/leave.service';
 import { DEFAULT_LEAVE_TYPES } from '../constants';
 import { ymd } from '../utils/attendanceSheet';
 import { halfDayLabel } from '../utils/halfDay';
@@ -48,8 +49,14 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []);
   const [leaveTypes, setLeaveTypes] = useState<CustomLeaveType[]>(DEFAULT_LEAVE_TYPES.filter(t => t.hasBalance));
-  const TYPES = leaveTypes.map(t => t.id);
-  const label = (id: string) => (leaveTypes.find(t => t.id === id)?.name || id).replace(/ Leave$/, '');
+  // Unpaid leave has no balance; it is counted from 0 each year against a limit Maruthi sets (none = unlimited).
+  const [unpaidType, setUnpaidType] = useState<CustomLeaveType | null>(null);
+  const [unpaid, setUnpaid] = useState<UnpaidLeaveUsage | null>(null);
+  const UNPAID = 'UNPAID';
+  const BAL_TYPES = leaveTypes.map(t => t.id);
+  const TYPES = unpaidType ? [...BAL_TYPES, UNPAID] : BAL_TYPES;
+  const label = (id: string) => ([...leaveTypes, ...(unpaidType ? [unpaidType] : [])].find(t => t.id === id)?.name || id).replace(/ Leave$/, '');
+  const unpaidLeft = unpaid && unpaid.limit !== null ? Math.max(0, unpaid.limit - unpaid.used) : null;
   const [type, setType] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -81,6 +88,11 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
         if (!alive) return;
         const withBalance = types.filter(t => t.hasBalance);
         if (withBalance.length) setLeaveTypes(withBalance);
+        // Offer Unpaid only once its yearly count loads (needs migration 0091).
+        const unpaidRow = await Promise.resolve().then(() => hrService.getUnpaidLeaveOverview()).then(o => o.people.find(p => p.employeeId === user.id) || null).catch(() => null);
+        if (!alive) return;
+        setUnpaid(unpaidRow);
+        setUnpaidType(unpaidRow ? (types.find(t => t.id === UNPAID) || null) : null);
         setBalance(bal); setLeaves(requests.filter(l => l.employeeId === user.id));
         setAttendance(active || logs.filter(l => l.date === today).sort((a,b) => (b.checkIn || '').localeCompare(a.checkIn || ''))[0]);
         setWorkingDays((shift?.workingDays || config.workingDays || []).map(d => d.slice(0,3).toUpperCase()));
@@ -115,14 +127,15 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
       if (workingDays.includes(d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()) && !holidays.includes(ymd(d))) days++;
     }
   }
-  const remaining = Number(balance?.[type] || 0);
-  const validation = !start ? '' : start < today ? 'Choose today or a future date.' : end < start ? 'End date is before the start date.' : !days ? 'These dates fall on non-working days.' : leaves.some(l => l.status !== 'REJECTED' && l.startDate <= end && l.endDate >= start) ? 'You already have a leave request on these dates.' : days > remaining ? `Only ${remaining} ${label(type).toLowerCase()} days left.` : '';
+  const remaining = type === UNPAID ? (unpaidLeft ?? Infinity) : Number(balance?.[type] || 0);
+  const validation = !start ? '' : start < today ? 'Choose today or a future date.' : end < start ? 'End date is before the start date.' : !days ? 'These dates fall on non-working days.' : leaves.some(l => l.status !== 'REJECTED' && l.startDate <= end && l.endDate >= start) ? 'You already have a leave request on these dates.' : days > remaining ? (type === UNPAID ? `Only ${remaining} unpaid ${remaining === 1 ? 'day' : 'days'} left this year. Ask Maruthi to raise your limit.` : `Only ${remaining} ${label(type).toLowerCase()} days left.`) : '';
   const submitLeave = async () => {
     if (!canWrite || busy || !days || validation || !note.trim()) return;
     setBusy('leave'); setFormError('');
     try {
       await employeeService.applyForLeave({ type, startDate: start, endDate: end, totalDays: days, reason: note.trim() }, user);
       const requests = await hrService.getLeaves(); setLeaves(requests.filter(l => l.employeeId === user.id));
+      if (type === UNPAID) setUnpaid(u => u && { ...u, used: u.used + days });
       close(); setMessage(`${label(type)} leave request sent`);
     } catch (e) { setFormError(e instanceof Error ? e.message : 'Could not send request.'); }
     finally { setBusy(''); }
@@ -181,11 +194,12 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
       {!query.trim() && tasks.some(old) && <button className={`more${history ? ' open' : ''}`} aria-expanded={history} onClick={() => setHistory(!history)}>{history ? 'Hide finished tasks' : `Show more (${tasks.filter(old).length} finished earlier)`}<ChevronDown size={16}/></button>}
     </main>
     {open && <dialog ref={sheet} className="sheet show" aria-labelledby="sheetTitle" style={kbLift ? { bottom: kbLift, maxHeight: `calc(100% - ${kbLift + 12}px)` } : undefined} onCancel={e => { e.preventDefault(); if (busy !== 'leave') close(); }} onClick={e => { if (e.target === e.currentTarget && busy !== 'leave') { const r=e.currentTarget.getBoundingClientRect(); if(e.clientY < r.top || e.clientX < r.left || e.clientX > r.right) close(); } }}><div className="grab"/><div className="sheet-h"><h2 id="sheetTitle">Leave</h2><button className="x" aria-label="Close" disabled={busy === 'leave'} onClick={close}><X size={18}/></button></div>
-      <div className="bal">{TYPES.map(t => <div key={t}><b>{balance ? Number(balance[t] || 0) : '–'}</b><span>{label(t)}</span></div>)}</div>
+      <div className="bal">{BAL_TYPES.map(t => <div key={t}><b>{balance ? Number(balance[t] || 0) : '–'}</b><span>{label(t)}</span></div>)}
+        {unpaidType && unpaid && <div className="unpaid" title={unpaid.limit === null ? 'Unpaid days used this year (no limit)' : `Unpaid days used this year, out of ${unpaid.limit}`}><b>{unpaid.used}{unpaid.limit !== null && <small>/{unpaid.limit}</small>}</b><span>Unpaid used</span></div>}</div>
       <div className="fl"><span className="lab" id="leave-type">Leave type</span><div className="tseg" role="radiogroup" aria-labelledby="leave-type">{TYPES.map(t => <button key={t} role="radio" aria-checked={type===t} onClick={() => setType(t)}>{label(t)}</button>)}</div></div>
       <div className="fl dates show"><div className="field"><label htmlFor="leave-from">From</label><input id="leave-from" type="date" min={today} value={from} onChange={e => { const v = e.target.value; setFrom(v); if (!to || to < v) setTo(v); }}/></div><div className="field"><label htmlFor="leave-to">To</label><input id="leave-to" type="date" min={from || today} value={to} onChange={e => setTo(e.target.value)}/></div></div>
       <div className="fl"><label className="lab" htmlFor="leave-note">Reason</label><input id="leave-note" className="note" required placeholder="e.g. Family function" autoComplete="off" value={note} onChange={e => setNote(e.target.value)}/></div>
-      {formError || validation ? <div className="err" role="alert">{formError || validation}</div> : <div className="msg">{!start ? 'Select dates' : <><b>{days} {days === 1 ? 'day' : 'days'}</b> · {remaining - days} {label(type)} left after{!note.trim() && ' · add a reason'}</>}</div>}
+      {formError || validation ? <div className="err" role="alert">{formError || validation}</div> : <div className="msg">{!start ? 'Select dates' : <><b>{days} {days === 1 ? 'day' : 'days'}</b> · {type === UNPAID ? (unpaidLeft === null ? `unpaid, ${(unpaid?.used || 0) + days} used this year` : `${unpaidLeft - days} unpaid left this year after`) : `${remaining - days} ${label(type)} left after`}{!note.trim() && ' · add a reason'}</>}</div>}
       <button className="btn primary send" disabled={!!busy || !canWrite || !start || !days || !!validation || !note.trim()} onClick={submitLeave}>{busy==='leave' ? 'Sending…' : 'Apply leave'}</button>
       <div className="upc"><h3>Upcoming leave requests</h3>{!upcoming.length ? <span>No upcoming requests</span> : upcoming.map(l => <div className="lv" key={l.id}><div className="cal"><b>{date(l.startDate).getDate()}</b><span>{date(l.startDate).toLocaleDateString('en-GB',{month:'short'})}</span></div><div className="t"><b>{label(l.type)} leave</b><span>{l.startDate === l.endDate ? date(l.startDate).toLocaleDateString('en-GB',{weekday:'long'}) : `${short(l.startDate)} – ${short(l.endDate)}`}, {l.totalDays === 0.5 ? 'Half day' : `${l.totalDays} ${l.totalDays === 1 ? 'day' : 'days'}`}</span></div><span className={`pill ${l.status === 'APPROVED' ? 'ok' : l.status === 'REJECTED' ? 'bad' : 'pend'}`}>{l.status === 'APPROVED' ? '✓ Approved' : l.status === 'REJECTED' ? '× Rejected' : '◷ Pending'}</span></div>)}</div>
     </dialog>}

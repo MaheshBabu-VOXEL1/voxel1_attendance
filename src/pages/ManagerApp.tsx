@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { User, Employee, LeaveRequest, CustomLeaveType, Holiday, LeaveBalance, Attendance } from '../types';
 import { employeeService } from '../services/employee.service';
 import { hrService } from '../services/hrService';
+import type { UnpaidLeaveOverview } from '../services/leave.service';
 import { assignedTaskService, AssignedTask, TaskStatus, TaskProject, TaskPriority, PRIORITIES, priorityLabel, priorityOf, priorityRank } from '../services/assignedTask.service';
 import { calendarService, CalendarEvent } from '../services/calendar.service';
 import { useAssignedTasks } from '../hooks/useAssignedTasks';
@@ -73,7 +74,7 @@ const NAV: [Route, string, React.ReactNode][] = [
 ];
 
 interface MenuItem { v: string; label: string; sub?: string; lead?: React.ReactNode; on?: boolean; muted?: boolean; sep?: boolean }
-interface Pop { anchor: HTMLElement; kind: 'menu' | 'due' | 'newproj'; head?: React.ReactNode; items?: MenuItem[]; cur?: string | null; pick: (v: string) => void }
+interface Pop { anchor: HTMLElement; kind: 'menu' | 'due' | 'newproj' | 'limit'; head?: React.ReactNode; items?: MenuItem[]; cur?: string | null; pick: (v: string) => void }
 
 export default function ManagerApp({ user, onNavigate }: { user: User; onNavigate?: (path: string) => void }) {
   const { darkMode, setDarkModePreference } = useTheme();
@@ -100,6 +101,10 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<CustomLeaveType[]>(DEFAULT_LEAVE_TYPES);
   const [balances, setBalances] = useState<Record<string, LeaveBalance>>({});
+  // Unpaid leave this year: used / limit per person; Maruthi (or Admin) sets the limits.
+  const [unpaidOv, setUnpaidOv] = useState<UnpaidLeaveOverview | null>(null);
+  const [limitVal, setLimitVal] = useState('');
+  const [limitBusy, setLimitBusy] = useState(false);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [workingDays, setWorkingDays] = useState<string[]>(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']);
@@ -129,6 +134,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     const pendingIds = Array.from(new Set(rows.filter(l => l.status === 'PENDING_MANAGER').map(l => l.employeeId)));
     const pairs = await Promise.all(pendingIds.map(async id => [id, await hrService.getLeaveBalance(id)] as const));
     setBalances(Object.fromEntries(pairs));
+    setUnpaidOv(await Promise.resolve().then(() => hrService.getUnpaidLeaveOverview()).catch(() => null));
   }, []);
   const loadCalendar = useCallback(async () => {
     const [hols, evs] = await Promise.all([hrService.getHolidays(), calendarService.listEvents(rd(-400), rd(400))]);
@@ -202,7 +208,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     // The visible area shrinks when a phone keyboard opens; keep the popover inside it.
     const vv = window.visualViewport, vTop = vv?.offsetTop ?? 0, vH = vv?.height ?? window.innerHeight;
     let top = r.bottom + 6; if (top + h > window.innerHeight - 72 && r.top - h - 6 > 8) top = r.top - h - 6;
-    if (p.kind === 'newproj') top = Math.min(Math.max(top, vTop + 8), vTop + vH - h - 8);
+    if (p.kind === 'newproj' || p.kind === 'limit') top = Math.min(Math.max(top, vTop + 8), vTop + vH - h - 8);
     setPopPos({ top: Math.max(8, top), left: Math.min(Math.max(12, r.left), window.innerWidth - w - 12) });
   }, []);
   useEffect(() => { if (pop) placePop(pop); }, [pop, placePop]);
@@ -212,7 +218,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     // On phones the page resizes and scrolls by itself: the address bar slides in and out, and the keyboard
     // opens for a box you type in. Follow the page instead of closing; close only when the button the
     // popover belongs to scrolls out of sight, or the screen width changes (the phone was rotated).
-    const typing = pop.kind === 'newproj', w0 = window.innerWidth;
+    const typing = pop.kind === 'newproj' || pop.kind === 'limit', w0 = window.innerWidth;
     const onMove = () => {
       const r = pop.anchor.getBoundingClientRect();
       if (!typing && (window.innerWidth !== w0 || r.bottom < 0 || r.top > window.innerHeight)) { setPop(null); return; }
@@ -459,6 +465,13 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         <input id="npName" ref={focusNoScroll} className="inp" placeholder="Project name" maxLength={200} autoComplete="off" enterKeyHint="done" value={newProjName} onChange={e => setNewProjName(e.target.value)} />
         <div className="np-a"><button type="button" className="btn" onClick={() => setPop(null)}>Cancel</button>
           <button type="submit" className="btn pri" disabled={!newProjName.trim() || newProjBusy}>{newProjBusy ? 'Creating…' : 'Create'}</button></div>
+      </form> : pop.kind === 'limit' ? <form className="np" onSubmit={e => { e.preventDefault(); if (limitVal.trim()) pop.pick(limitVal.trim()); }}>
+        <div className="phd">{pop.head}</div>
+        <label className="vh" htmlFor="ulLimit">Unpaid days a year</label>
+        <div className="ul-in"><input id="ulLimit" ref={focusNoScroll} className="inp" type="number" inputMode="decimal" min={0} max={366} step={0.5} placeholder="e.g. 9"
+          value={limitVal} onChange={e => setLimitVal(e.target.value)} /><span>days a year</span></div>
+        <div className="np-a"><button type="button" className="btn ghost" disabled={limitBusy} onClick={() => pop.pick('')}>{pop.cur ? "Use everyone's limit" : 'No limit'}</button>
+          <button type="submit" className="btn pri" disabled={!limitVal.trim() || limitBusy}>{limitBusy ? 'Saving…' : 'Save'}</button></div>
       </form> : DueSeg(pop.cur ?? null, v => { const p = pop.pick; setPop(null); p(v); }, !!pop.cur)}
     </div>}
 
@@ -740,6 +753,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         const fl: [string, string][] = others.map(o => ['', `Also off: ${o.employeeName} (${range(o.startDate, o.endDate)}${o.status.startsWith('PENDING') ? ', pending' : ''})`]);
         if (due.length) fl.push(['', `${plural(due.length, 'task')} due while away: ${due.map(t => t.description).join('; ')}`]);
         if (bal !== null && days > bal) fl.push(['bad', `Only ${bal} ${typeName(l.type).toLowerCase()} days left`]);
+        const up = l.type === 'UNPAID' ? unpaidOv?.people.find(p => p.employeeId === l.employeeId) : undefined;
+        if (up) fl.push([up.limit !== null && up.used > up.limit ? 'bad' : '', `Unpaid this year: ${up.used}${up.limit !== null ? ` of ${up.limit}` : ''} ${up.used === 1 ? 'day' : 'days'}, this request included${up.limit === null ? ' (no limit)' : ''}`]);
         if (!fl.length) fl.push(['ok', 'No clashes with leave or deadlines']);
         return <div className="lv" key={l.id}>
           <div className="lh"><span className="av">{ini(l.employeeName)}</span><div className="t"><b>{l.employeeName}</b><span className="d">{range(l.startDate, l.endDate)} · {days} {days === 1 ? 'day' : 'days'}</span></div><span className="tag">{typeName(l.type)}</span></div>
@@ -756,6 +771,44 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         <div className="t"><b>{l.employeeName}</b><span>{typeName(l.type)} · {range(l.startDate, l.endDate)}</span></div>
         {l.status === 'APPROVED' ? <span className="st ok">{I.check}Approved</span> : <span className="st bad">{I.cross}Rejected</span>}</div>)
         : <div className="empty">None yet</div>}</div>
+      {unpaidOv && UnpaidLimits(unpaidOv)}
+    </>;
+  }
+
+  function UnpaidLimits(ov: UnpaidLeaveOverview) {
+    const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`;
+    const edit = (anchor: HTMLElement, id: string | null, name: string, cur: number | null) => {
+      setLimitVal(cur === null ? '' : String(cur));
+      openPop({ anchor, kind: 'limit', head: id ? `Unpaid limit · ${name}` : 'Unpaid limit · everyone', cur: id, pick: v => void save(id, name, v) });
+    };
+    const save = async (id: string | null, name: string, v: string) => {
+      const n = v === '' ? null : Number(v);
+      if (n !== null && !(n >= 0 && n <= 366 && Number.isInteger(n * 2))) { say('Enter 0 to 366 days (half days allowed)'); return; }
+      setLimitBusy(true);
+      try {
+        await hrService.setUnpaidLeaveLimit(id, n);
+        setUnpaidOv(await hrService.getUnpaidLeaveOverview());
+        setPop(null);
+        say(id ? (n === null ? `${name} uses everyone's limit` : `${name}: ${days(n)} unpaid a year`) : (n === null ? 'No unpaid limit for everyone' : `Everyone: ${days(n)} unpaid a year`));
+      } catch (e) { fail(e); } finally { setLimitBusy(false); }
+    };
+    const rows = ov.people.filter(p => p.used > 0 || p.ownLimit).sort((a, b) => b.used - a.used || a.name.localeCompare(b.name));
+    const pickPerson = (anchor: HTMLElement) => openPop({
+      anchor, kind: 'menu', head: <>{I.user}Set a limit for</>, pick: id => { const p = ov.people.find(x => x.employeeId === id); if (p) edit(anchor, p.employeeId, p.name, p.ownLimit ? p.limit : null); },
+      items: ov.people.map(p => ({ v: p.employeeId, label: p.name, sub: `${p.used} used${p.limit !== null ? ` of ${p.limit}` : ''}`, on: p.ownLimit })),
+    });
+    return <>
+      <div className="sec"><h2>Unpaid leave {ov.year}</h2><span>{ov.canEdit ? '' : 'Set by Maruthi'}</span></div>
+      <div className="list">
+        <div className="rw"><div className="t"><b>Everyone</b><span>{ov.defaultLimit === null ? 'No limit · unpaid days are only counted' : `${days(ov.defaultLimit)} a year each · counts from 0 every January`}</span></div>
+          {ov.canEdit && <button type="button" className="btn" onClick={e => edit(e.currentTarget, null, 'Everyone', ov.defaultLimit)}>Edit</button>}</div>
+        {rows.map(p => <div className="rw" key={p.employeeId}><span className="av sm">{ini(p.name)}</span>
+          <div className="t"><b>{p.name}</b><span>{p.used} used{p.limit !== null ? ` of ${p.limit}` : ''}{p.ownLimit ? ' · own limit' : ''}</span></div>
+          {p.limit !== null && p.used >= p.limit && <span className={`st ${p.used > p.limit ? 'bad' : 'warn'}`}>{p.used > p.limit ? 'Over' : 'Used up'}</span>}
+          {ov.canEdit && <button type="button" className="btn" aria-label={`Edit unpaid limit for ${p.name}`} onClick={e => edit(e.currentTarget, p.employeeId, p.name, p.ownLimit ? p.limit : null)}>Edit</button>}</div>)}
+        {!rows.length && <div className="empty">No unpaid leave taken in {ov.year} yet</div>}
+      </div>
+      {ov.canEdit && <button type="button" className="more" onClick={e => pickPerson(e.currentTarget)}>Set a limit for one person</button>}
     </>;
   }
 

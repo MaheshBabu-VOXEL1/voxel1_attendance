@@ -13,6 +13,13 @@ const tasks = [
   { id: 't2', employee_id: null, employee_name: null, assigned_by: 'other-manager', manager_name: 'Main Manager', description: 'Door schedule update', project_name: 'Vyoma', status: 'NOT_STARTED', self_created: false, created: '2026-10-08T04:00:00Z' },
   { id: 't3', employee_id: 'e2', employee_name: 'Ravi', assigned_by: 'mgr', description: 'Own note', project_name: null, status: 'START', self_created: true, created: '2026-10-08T03:00:00Z' },
 ];
+// Unpaid leave overview: empty by default (keeps names out of the other leave tests); the unpaid tests set UNPAID_FULL.
+const unpaid = vi.hoisted(() => ({ value: { year: 2026, defaultLimit: null, canEdit: true, people: [] } as any }));
+const UNPAID_FULL = { year: 2026, defaultLimit: 9, canEdit: true, people: [
+  { employeeId: 'e1', name: 'Divya Kallepalli', used: 10, limit: 9, ownLimit: false },
+  { employeeId: 'e2', name: 'Ravi', used: 0, limit: 12, ownLimit: true },
+  { employeeId: 'e4', name: 'Abhinay', used: 0, limit: 9, ownLimit: false },
+] };
 vi.mock('../../hooks/useAssignedTasks', () => ({ useAssignedTasks: () => ({ tasks, loading: false, error: '', refresh: vi.fn(async () => {}) }) }));
 vi.mock('../../context/ThemeContext', () => ({ useTheme: () => ({ darkMode: false, setDarkModePreference: vi.fn() }) }));
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ logout: vi.fn() }) }));
@@ -29,6 +36,8 @@ vi.mock('../../services/hrService', () => ({ hrService: {
   ]),
   getLeaveBalance: vi.fn(async () => ({ employeeId: 'e1', CASUAL_SICK: 5, PAID: 7 })),
   isLeaveApprover: vi.fn(async () => true),
+  getUnpaidLeaveOverview: vi.fn(async () => unpaid.value),
+  setUnpaidLeaveLimit: vi.fn(async () => {}),
   getLeaveTypes: async () => [{ id: 'CASUAL_SICK', name: 'Casual & Sick Leave', color: '', hasBalance: true }, { id: 'PAID', name: 'Paid Leave', color: '', hasBalance: true }],
   getConfig: async () => ({ workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] }),
   getHolidays: vi.fn(async () => [{ id: 'h1', date: today, name: 'Company day', isGovernment: false, type: 'FESTIVAL' }]),
@@ -49,6 +58,7 @@ const user = { id: 'mgr', name: 'Test Manager', role: 'MANAGER', email: 'tm@exam
 describe('manager app', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    unpaid.value = { year: 2026, defaultLimit: null, canEdit: true, people: [] };
     HTMLDialogElement.prototype.showModal = function() { this.setAttribute('open', ''); };
   });
 
@@ -439,5 +449,41 @@ describe('manager app', () => {
     fireEvent.click(screen.getByRole('option', { name: /High/ }));
     await waitFor(() => expect(assignedTaskService.setPlan).toHaveBeenCalledWith('t2', { priority: 'HIGH', dueDate: null, halfDay: false }));
     expect(assignedTaskService.managerUpdate).not.toHaveBeenCalled();
+  });
+
+  it('shows unpaid leave used / limit on the Leaves tab and lets the approver change everyone\'s limit', async () => {
+    unpaid.value = UNPAID_FULL;
+    render(<ManagerApp user={user} />);
+    fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
+    await screen.findByRole('heading', { name: 'Unpaid leave 2026' });
+    expect(screen.getByText('9 days a year each · counts from 0 every January')).toBeInTheDocument();
+    expect(screen.getByText('10 used of 9')).toBeInTheDocument();
+    expect(screen.getByText('Over')).toBeInTheDocument();
+    expect(screen.getByText('0 used of 12 · own limit')).toBeInTheDocument();
+    expect(screen.queryByText(/Abhinay/)).not.toBeInTheDocument();
+    const everyone = screen.getByText('Everyone').closest('.rw') as HTMLElement;
+    fireEvent.click(within(everyone).getByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByLabelText('Unpaid days a year'), { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(hrService.setUnpaidLeaveLimit).toHaveBeenCalledWith(null, 12));
+  });
+
+  it('removes a person\'s own unpaid limit so they use everyone\'s again', async () => {
+    unpaid.value = UNPAID_FULL;
+    render(<ManagerApp user={user} />);
+    fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit unpaid limit for Ravi' }));
+    expect(screen.getByLabelText('Unpaid days a year')).toHaveValue(12);
+    fireEvent.click(screen.getByRole('button', { name: "Use everyone's limit" }));
+    await waitFor(() => expect(hrService.setUnpaidLeaveLimit).toHaveBeenCalledWith('e2', null));
+  });
+
+  it('shows the limits read-only to managers who are not the approver', async () => {
+    unpaid.value = { year: 2026, defaultLimit: null, canEdit: false, people: [] };
+    render(<ManagerApp user={user} />);
+    fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
+    await screen.findByText('Set by Maruthi');
+    expect(screen.getByText('No limit · unpaid days are only counted')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Set a limit for one person' })).not.toBeInTheDocument();
   });
 });
