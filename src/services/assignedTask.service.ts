@@ -1,6 +1,13 @@
 import { supabase } from './supabase';
 
 export type TaskStatus = 'NOT_STARTED' | 'START' | 'PROGRESS' | 'STUCK' | 'END';
+export type TaskPriority = 'HIGH' | 'MEDIUM' | 'LOW';
+export const PRIORITIES: TaskPriority[] = ['HIGH', 'MEDIUM', 'LOW'];
+export const priorityLabel: Record<TaskPriority, string> = { HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low' };
+/** Rows written before priority existed (or before the migration ran) count as Medium. */
+export const priorityOf = (t: { priority?: TaskPriority | null }): TaskPriority => t.priority || 'MEDIUM';
+/** Sort key: High first. */
+export const priorityRank = (t: { priority?: TaskPriority | null }) => PRIORITIES.indexOf(priorityOf(t));
 export interface AssignedTask {
   id: string;
   /** null while the task is unassigned (saved by a manager without a person yet). */
@@ -23,6 +30,12 @@ export interface AssignedTask {
   stuck_progress?: number | null;
   stuck_reason?: string | null;
   stuck_at?: string | null;
+  /** HIGH is finished first; missing = MEDIUM. */
+  priority?: TaskPriority | null;
+  /** How many times an existing deadline was moved, by whom last and when. */
+  due_changes?: number | null;
+  due_changed_by?: string | null;
+  due_changed_at?: string | null;
   project_name?: string | null;
   status: TaskStatus;
   created: string;
@@ -95,6 +108,12 @@ export const assignedTaskService = {
   /** Marks a task the manager created as a half-day task (due today), or clears the mark. */
   async setHalfDay(taskId: string, halfDay: boolean): Promise<AssignedTask> {
     const { data, error } = await supabase.rpc('set_task_half_day', { p_task_id: taskId, p_half_day: halfDay });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+  /** Any manager or admin: set priority, due date and half-day mark on any task in the organization. */
+  async setPlan(taskId: string, f: { priority: TaskPriority; dueDate: string | null; halfDay: boolean }): Promise<AssignedTask> {
+    const { data, error } = await supabase.rpc('manager_set_task_plan', { p_task_id: taskId, p_priority: f.priority, p_due_date: f.dueDate || null, p_half_day: f.halfDay });
     if (error) throw new Error(error.message);
     return data;
   },

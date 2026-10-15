@@ -15,6 +15,16 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-10-15',
+    title: 'Task priority, manager control of deadlines, more task filters',
+    entries: [
+      { type: 'feature', description: 'Task priority: every task is High, Medium or Low (default Medium). The Manager add-task bar has a Priority picker; each open task shows a HIGH / MEDIUM / LOW tag, and every group lists High first, then the earliest deadline. The employee My Tasks list shows the tag and puts High on top.' },
+      { type: 'feature', description: 'Any manager (Manager mode included) or Admin can now change the priority and due date of any task on the shared board, not only tasks they created; tap the tag or the due date on the row, or use the task sheet. Every move of an existing deadline is counted and the sheet shows "Deadline moved 2× · last by Maruthi". Swipe left (change date) works on every task.' },
+      { type: 'feature', description: 'Task filters on the Manager board: All, Due today, Overdue, High priority, Stuck, Assigned to me and Assigned by me, each with a live count, combined with the project filter and search.' },
+      { type: 'improvement', description: 'Migration 0088_task_priority (priority, due_changes, due_changed_by, due_changed_at columns; manager_set_task_plan RPC; deadline-move trigger) must be run in the Supabase SQL Editor before this release is pushed.' },
+    ],
+  },
+  {
     date: '2026-10-13',
     title: 'Attendance hours no longer double-counted; duplicate check-ins blocked',
     entries: [

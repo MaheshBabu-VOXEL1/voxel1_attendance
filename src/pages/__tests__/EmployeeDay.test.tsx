@@ -7,7 +7,7 @@ vi.mock('../../services/supabase', async (original) => { const actual = await or
 const mocks = vi.hoisted(() => ({ status: vi.fn(), stuck: vi.fn(), leave: vi.fn(), refresh: vi.fn(), extra: [] as any[] }));
 vi.mock('../../context/ThemeContext', () => ({ useTheme: () => ({ darkMode: false }) }));
 vi.mock('../../context/SubscriptionContext', () => ({ useSubscription: () => ({ canPerformAction: () => true }) }));
-vi.mock('../../services/assignedTask.service', () => ({ assignedTaskService: { setStatus: mocks.status, markStuck: mocks.stuck } }));
+vi.mock('../../services/assignedTask.service', async (original) => ({ ...(await original<typeof import('../../services/assignedTask.service')>()), assignedTaskService: { setStatus: mocks.status, markStuck: mocks.stuck } }));
 vi.mock('../../services/employeeService', () => ({ employeeService: { applyForLeave: mocks.leave } }));
 vi.mock('../../hooks/useAssignedTasks', () => ({ useAssignedTasks: () => ({ loading: false, error: '', refresh: mocks.refresh, tasks: [{id:'task1',description:'Review model',project_name:'Vyoma',created:'2026-10-01T09:00:00Z',status:'START',completed_at:null}, {id:'task2',description:'Old drawing',status:'END',completed_at:'2020-01-01T10:00:00Z'}, ...mocks.extra] }) }));
 vi.mock('../../services/hrService', () => ({ hrService: {

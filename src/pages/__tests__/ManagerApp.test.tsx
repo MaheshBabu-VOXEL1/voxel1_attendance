@@ -41,7 +41,7 @@ vi.mock('../../services/calendar.service', () => ({ calendarService: {
 } }));
 vi.mock('../../services/assignedTask.service', async (orig) => {
   const real = await orig<typeof import('../../services/assignedTask.service')>();
-  return { ...real, assignedTaskService: { setStatus: vi.fn(async () => ({})), listModeSwitcherIds: vi.fn(async () => ['e3']), listProjects: vi.fn(async () => [{ id: 'p2', name: 'KAFD', project_number: 2 }]), createProject: vi.fn(async (n: string) => ({ id: 'p3', name: n, project_number: 3 })), assign: vi.fn(async () => ({ id: 'n1' })), createUnassigned: vi.fn(async () => ({ id: 'n2' })), managerUpdate: vi.fn(async () => ({})), markStuck: vi.fn(async () => ({})), setHalfDay: vi.fn(async () => ({})), managerDelete: vi.fn(async () => {}) } };
+  return { ...real, assignedTaskService: { setStatus: vi.fn(async () => ({})), listModeSwitcherIds: vi.fn(async () => ['e3']), listProjects: vi.fn(async () => [{ id: 'p2', name: 'KAFD', project_number: 2 }]), createProject: vi.fn(async (n: string) => ({ id: 'p3', name: n, project_number: 3 })), assign: vi.fn(async () => ({ id: 'n1' })), createUnassigned: vi.fn(async () => ({ id: 'n2' })), managerUpdate: vi.fn(async () => ({})), markStuck: vi.fn(async () => ({})), setHalfDay: vi.fn(async () => ({})), setPlan: vi.fn(async () => ({})), managerDelete: vi.fn(async () => {}) } };
 });
 
 const user = { id: 'mgr', name: 'Test Manager', role: 'MANAGER', email: 'tm@example.com' } as any;
@@ -59,7 +59,7 @@ describe('manager app', () => {
     expect(screen.getByText('Written by Ravi')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Door schedule update' }));
     expect(screen.getAllByText('Assigned by Main Manager → Unassigned')).toHaveLength(2);
-    expect(screen.getByText('Created by another manager. Only they can change it.')).toBeInTheDocument();
+    expect(screen.getByText(/Created by another manager\. You can change its priority and due date/)).toBeInTheDocument();
   });
 
   it('finds shared tasks by the assigner name', async () => {
@@ -159,7 +159,7 @@ describe('manager app', () => {
     expect(within(seg).getByRole('button', { name: 'Half Day' })).toHaveAttribute('aria-pressed', 'true');
     expect(within(seg).getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    await waitFor(() => expect(assignedTaskService.setHalfDay).toHaveBeenCalledWith('n2', true));
+    await waitFor(() => expect(assignedTaskService.setPlan).toHaveBeenCalledWith('n2', { priority: 'MEDIUM', dueDate: today, halfDay: true }));
     expect(assignedTaskService.createUnassigned).toHaveBeenCalledWith('Pump room check', 'Vyoma', today);
   });
 
@@ -396,5 +396,48 @@ describe('manager app', () => {
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Client review' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add to calendar' }));
     await waitFor(() => expect(calendarService.addEvent).toHaveBeenCalledWith('Client review', today));
+  });
+
+  it('lists High priority first within a group and filters by Due today, High priority and Overdue', async () => {
+    const yest = ymd(new Date(Date.now() - 864e5));
+    const extra = [
+      { id: 'p1', employee_id: 'e1', employee_name: 'Divya Kallepalli', assigned_by: 'mgr', manager_name: 'Test Manager', description: 'Low job', project_name: 'Vyoma', due_date: today, priority: 'LOW', status: 'NOT_STARTED', self_created: false, created: '2026-10-08T09:00:00Z' },
+      { id: 'p2', employee_id: 'e1', employee_name: 'Divya Kallepalli', assigned_by: 'mgr', manager_name: 'Test Manager', description: 'Urgent job', project_name: 'Vyoma', due_date: today, priority: 'HIGH', status: 'NOT_STARTED', self_created: false, created: '2026-10-08T08:00:00Z' },
+      { id: 'p3', employee_id: 'e1', employee_name: 'Divya Kallepalli', assigned_by: 'mgr', manager_name: 'Test Manager', description: 'Late job', project_name: 'Vyoma', due_date: yest, status: 'NOT_STARTED', self_created: false, created: '2026-10-08T07:00:00Z' },
+    ] as any[];
+    tasks.push(...extra);
+    try {
+      render(<ManagerApp user={user} />);
+      const order = Array.from(document.querySelectorAll('.tt')).map(b => b.textContent);
+      expect(order.indexOf('Urgent job')).toBeLessThan(order.indexOf('Review shaft sizes'));
+      expect(order.indexOf('Review shaft sizes')).toBeLessThan(order.indexOf('Low job'));
+      const bar = screen.getByRole('group', { name: 'Filter tasks' });
+      fireEvent.click(within(bar).getByRole('button', { name: /High priority/ }));
+      expect(screen.getByText('Urgent job')).toBeInTheDocument();
+      expect(screen.queryByText('Low job')).not.toBeInTheDocument();
+      fireEvent.click(within(bar).getByRole('button', { name: /Overdue/ }));
+      expect(screen.getByText('Late job')).toBeInTheDocument();
+      expect(screen.queryByText('Urgent job')).not.toBeInTheDocument();
+      fireEvent.click(within(bar).getByRole('button', { name: /Due today/ }));
+      expect(screen.getByText('Low job')).toBeInTheDocument();
+      expect(screen.queryByText('Late job')).not.toBeInTheDocument();
+    } finally { tasks.splice(tasks.length - 3, 3); }
+  });
+
+  it('saves a new task with the chosen priority', async () => {
+    render(<ManagerApp user={user} />);
+    fireEvent.change(screen.getByLabelText('New task'), { target: { value: 'Pump room check' } });
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Priority' })).getByRole('radio', { name: 'High' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(assignedTaskService.setPlan).toHaveBeenCalledWith('n2', { priority: 'HIGH', dueDate: null, halfDay: false }));
+  });
+
+  it('lets any manager change priority on a task another manager created', async () => {
+    render(<ManagerApp user={user} />);
+    const row = screen.getByRole('button', { name: 'Door schedule update' }).closest('.trw') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Priority: Medium. Change priority' }));
+    fireEvent.click(screen.getByRole('option', { name: /High/ }));
+    await waitFor(() => expect(assignedTaskService.setPlan).toHaveBeenCalledWith('t2', { priority: 'HIGH', dueDate: null, halfDay: false }));
+    expect(assignedTaskService.managerUpdate).not.toHaveBeenCalled();
   });
 });

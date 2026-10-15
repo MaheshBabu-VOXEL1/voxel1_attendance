@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { User, Employee, LeaveRequest, CustomLeaveType, Holiday, LeaveBalance, Attendance } from '../types';
 import { employeeService } from '../services/employee.service';
 import { hrService } from '../services/hrService';
-import { assignedTaskService, AssignedTask, TaskStatus, TaskProject } from '../services/assignedTask.service';
+import { assignedTaskService, AssignedTask, TaskStatus, TaskProject, TaskPriority, PRIORITIES, priorityLabel, priorityOf, priorityRank } from '../services/assignedTask.service';
 import { calendarService, CalendarEvent } from '../services/calendar.service';
 import { useAssignedTasks } from '../hooks/useAssignedTasks';
 import { useTheme } from '../context/ThemeContext';
@@ -19,6 +19,7 @@ import StuckNoteDialog from '../components/tasks/StuckNoteDialog';
 
 type Route = 'tasks' | 'leaves' | 'attendance';
 type Group = 'date' | 'person' | 'project';
+type TFilter = 'all' | 'today' | 'overdue' | 'high' | 'stuck' | 'mine' | 'byme';
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
 const MONL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -36,6 +37,8 @@ const ST: Record<TaskStatus, [string, string]> = {
   STUCK: ['Stuck', 'Blocked, needs help or input'], END: ['Done', 'Finished'],
 };
 const ST_ORDER: TaskStatus[] = ['NOT_STARTED', 'START', 'PROGRESS', 'STUCK', 'END'];
+const PR_SUB: Record<TaskPriority, string> = { HIGH: 'Finish first', MEDIUM: 'Normal', LOW: 'When time allows' };
+const prioPill = (p: TaskPriority) => <span className={`prio ${p.toLowerCase()}`}>{priorityLabel[p]}</span>;
 
 const Svg = ({ w = 16, sw = 2.2, children }: { w?: number; sw?: number; children: React.ReactNode }) =>
   <svg width={w} height={w} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>;
@@ -242,6 +245,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [newProjBusy, setNewProjBusy] = useState(false);
   const [cpWho, setCpWho] = useState('');
   const [cpDue, setCpDue] = useState('');
+  const [cpPri, setCpPri] = useState<TaskPriority>('MEDIUM');
+  const [tfilter, setTfilter] = useState<TFilter>('all');
   const [text, setText] = useState('');
   const [adding, setAdding] = useState(false);
   const [groupBy, setGroupBy] = useState<Group>('date');
@@ -331,7 +336,23 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     : `Assigned by ${t.manager_name || (t.assigned_by === user.id ? user.name : 'Manager')} → ${t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Unassigned'}`;
   const task = (id: string) => tasks.find(t => t.id === id);
 
-  const update = async (t: AssignedTask, ch: Partial<{ who: string | null; due: string | null; s: TaskStatus; p: string; text: string }>, quiet = false) => {
+  const update = async (t: AssignedTask, ch: Partial<{ who: string | null; due: string | null; s: TaskStatus; p: string; text: string; pr: TaskPriority }>, quiet = false) => {
+    // Priority and deadline: any manager may change them on any task, so overdue work can be re-planned.
+    if (Object.keys(ch).every(k => k === 'due' || k === 'pr')) {
+      const prev = { priority: priorityOf(t), dueDate: t.due_date ?? null, halfDay: !!t.half_day };
+      const next = {
+        priority: ch.pr ?? prev.priority,
+        dueDate: 'due' in ch ? (ch.due ? dueOf(ch.due) : null) : prev.dueDate,
+        halfDay: 'due' in ch ? ch.due === HALF : prev.halfDay,
+      };
+      try {
+        await assignedTaskService.setPlan(t.id, next); await refresh();
+        if (quiet) return;
+        const msg = ch.pr ? `${priorityLabel[next.priority]} priority` : next.dueDate ? `Due ${dueWord(next.halfDay ? HALF : next.dueDate)}` : 'Due date removed';
+        say(msg, () => { void assignedTaskService.setPlan(t.id, prev).then(refresh).catch(fail); });
+      } catch (e) { fail(e); }
+      return;
+    }
     if (ch.s === 'STUCK' && t.status !== 'STUCK' && Object.keys(ch).length === 1) {
       if (!canEdit(t) && t.employee_id !== user.id) { say('Only the manager who created this task can change it'); return; }
       setStuckErr(''); setStuckFor(t); return;
@@ -393,6 +414,9 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   });
   const menuStatus = (anchor: HTMLElement, cur: TaskStatus, pick: (v: string) => void) => openPop({
     anchor, kind: 'menu', head: 'Status', pick, items: ST_ORDER.map(k => ({ v: k, label: ST[k][0], lead: SIC[k], sub: ST[k][1], on: cur === k })),
+  });
+  const menuPriority = (anchor: HTMLElement, cur: TaskPriority, pick: (v: string) => void) => openPop({
+    anchor, kind: 'menu', head: 'Priority', pick, items: PRIORITIES.map(k => ({ v: k, label: priorityLabel[k], lead: <span className={`prio-dot ${k.toLowerCase()}`} />, sub: PR_SUB[k], on: cur === k })),
   });
   const dueBar = (anchor: HTMLElement, cur: string | null, pick: (v: string) => void) => openPop({ anchor, kind: 'due', cur, pick });
 
@@ -466,14 +490,28 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   }
 
   function TasksView() {
-    const inF = (t: AssignedTask) => (pfilter === 'all' || t.project_name === pfilter)
+    const isOver = (t: AssignedTask) => (!!t.due_date && t.due_date < T0) || halfDayLate(t, now);
+    const FILTERS: [TFilter, string, (t: AssignedTask) => boolean][] = [
+      ['all', 'All', () => true],
+      ['today', 'Due today', t => t.due_date === T0 && !halfDayLate(t, now)],
+      ['overdue', 'Overdue', isOver],
+      ['high', 'High priority', t => priorityOf(t) === 'HIGH'],
+      ['stuck', 'Stuck', t => t.status === 'STUCK'],
+      ['mine', 'Assigned to me', t => t.employee_id === user.id],
+      ['byme', 'Assigned by me', t => !t.self_created && t.assigned_by === user.id],
+    ];
+    const tf = FILTERS.find(f => f[0] === tfilter)![2];
+    const inP = (t: AssignedTask) => (pfilter === 'all' || t.project_name === pfilter)
       && (!q || `${t.description} ${t.project_name || ''} ${t.employee_name || ''} ${t.manager_name || ''}`.toLowerCase().includes(q.toLowerCase()));
+    const inF = (t: AssignedTask) => inP(t) && tf(t);
     const open = tasks.filter(t => t.status !== 'END' && inF(t));
     const done = tasks.filter(t => t.status === 'END' && inF(t));
+    const fcount = (f: (t: AssignedTask) => boolean) => tasks.filter(t => t.status !== 'END' && inP(t) && f(t)).length;
     // Person view progress: tasks finished today out of today's work (finished today + still open).
     const doneTodayBy = (id: string) => done.filter(t => t.employee_id === id && !!t.completed_at && ymd(new Date(t.completed_at)) === T0).length;
-    const over = open.filter(t => (t.due_date && t.due_date < T0) || halfDayLate(t, now)).length, stuck = open.filter(t => t.status === 'STUCK').length;
-    const byDue = (a: AssignedTask, b: AssignedTask) => (a.due_date || '9').localeCompare(b.due_date || '9') || b.created.localeCompare(a.created);
+    const over = open.filter(isOver).length, stuck = open.filter(t => t.status === 'STUCK').length;
+    // High priority first, then the earliest deadline.
+    const byDue = (a: AssignedTask, b: AssignedTask) => priorityRank(a) - priorityRank(b) || (a.due_date || '9').localeCompare(b.due_date || '9') || b.created.localeCompare(a.created);
 
     const add = async () => {
       const items = text.split(';').map(x => x.trim()).filter(Boolean);
@@ -487,10 +525,10 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         for (const d of items) {
           const c = cpWho ? await assignedTaskService.assign(cpWho, d, project, due, 'NOT_STARTED') : await assignedTaskService.createUnassigned(d, project, due);
           created.push(c);
-          if (cpDue === HALF) await assignedTaskService.setHalfDay(c.id, true);
+          if (cpDue === HALF || cpPri !== 'MEDIUM') await assignedTaskService.setPlan(c.id, { priority: cpPri, dueDate: due || null, halfDay: cpDue === HALF });
         }
-        const msg = `${items.length > 1 ? `${items.length} tasks added` : 'Added'} · ${project}${cpWho ? ` · ${empName(cpWho)}` : ''}${cpDue ? ` · ${dueWord(cpDue)}` : ''}`;
-        setText(''); setCpWho(''); setCpDue('');
+        const msg = `${items.length > 1 ? `${items.length} tasks added` : 'Added'} · ${project}${cpWho ? ` · ${empName(cpWho)}` : ''}${cpDue ? ` · ${dueWord(cpDue)}` : ''}${cpPri !== 'MEDIUM' ? ` · ${priorityLabel[cpPri]}` : ''}`;
+        setText(''); setCpWho(''); setCpDue(''); setCpPri('MEDIUM');
         await Promise.all([refresh(), loadProjects()]);
         say(msg, () => { void Promise.all(created.map(c => assignedTaskService.managerDelete(c.id))).then(refresh).catch(fail); });
       } catch (e) { fail(e); } finally { setAdding(false); }
@@ -512,7 +550,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     }
     const shown = groups.filter(g => g.l.length || g.keep);
     // Person view: everyone with no open task (people on leave already have their own heading). Checked-in people first.
-    const free = groupBy === 'person' && pfilter === 'all' && !q.trim()
+    const free = groupBy === 'person' && pfilter === 'all' && tfilter === 'all' && !q.trim()
       ? people.filter(m => !onLeave(m.id, T0) && !tasks.some(t => t.employee_id === m.id && t.status !== 'END'))
         .sort((a, b) => Number(!!inToday?.has(b.id)) - Number(!!inToday?.has(a.id)) || a.name.localeCompare(b.name))
       : [];
@@ -542,6 +580,10 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
             {cpWho ? dot(cpWho) : I.user}<span>{cpWho ? empName(cpWho) : 'Assign'}</span>{I.down}</button>
           {DueSeg(cpDue || null, v => setCpDue(v))}
         </div>
+        <div className="c3"><span className="c3-l" id="cpPriL">Priority</span>
+          <div className="pseg" role="radiogroup" aria-labelledby="cpPriL">{PRIORITIES.map(k =>
+            <button key={k} type="button" role="radio" aria-checked={cpPri === k} className={k.toLowerCase()} onClick={() => setCpPri(k)}>{priorityLabel[k]}</button>)}</div>
+        </div>
       </div>
       <div className="tools">
         <button type="button" className="pf" aria-haspopup="listbox" onClick={e => menuProject(e.currentTarget, pfilter, v => setPfilter(v), true)}>
@@ -553,6 +595,11 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
             <button key={v} role="tab" aria-selected={groupBy === v} onClick={() => setGroupBy(v)}>{l}</button>)}
         </div>
       </div>
+      <div className="fbar" role="group" aria-label="Filter tasks">{FILTERS.map(([v, l, f]) => {
+        const n = v === 'all' ? 0 : fcount(f);
+        return <button key={v} type="button" className={`fchip${v === 'overdue' && n ? ' warn' : ''}`} aria-pressed={tfilter === v} onClick={() => setTfilter(tfilter === v && v !== 'all' ? 'all' : v)}>
+          {l}{v !== 'all' && <b>{n}</b>}</button>;
+      })}</div>
       {searchOn && <div className="srch">{I.search}<label className="vh" htmlFor="q">Search tasks</label>
         <input id="q" type="search" placeholder="Search task, project or person" value={q} autoFocus autoComplete="off" onChange={e => setQ(e.target.value)} />
         <button className="ibtn" aria-label="Close search" style={{ width: 36, height: 36 }} onClick={() => { setSearchOn(false); setQ(''); }}>{I.cross}</button></div>}
@@ -571,7 +618,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
             <button type="button" className="free-b" aria-label={`Assign a task to ${m.name}`} onClick={() => giveTask(m.id)}>Assign task</button>
           </div>)}</div>
         </>}
-        {!shown.length && !free.length && <div className="card empty" style={{ marginTop: 16 }}>{q ? `No tasks match “${q}”` : `No open tasks${pfilter === 'all' ? '' : ` on ${pfilter}`}`}</div>}
+        {!shown.length && !free.length && <div className="card empty" style={{ marginTop: 16 }}>{q ? `No tasks match “${q}”` : `No open tasks${tfilter === 'all' ? '' : ` in ${FILTERS.find(f => f[0] === tfilter)![1]}`}${pfilter === 'all' ? '' : ` on ${pfilter}`}`}</div>}
         {done.length > 0 && <>
           <button className="more" onClick={() => setShowDone(!showDone)}>{showDone ? 'Hide' : 'Show'} completed ({done.length})</button>
           {showDone && <div className="list" style={{ marginTop: 6 }}>{[...done].sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || '')).map(t => <React.Fragment key={t.id}>{TaskRow(t)}</React.Fragment>)}</div>}
@@ -592,16 +639,19 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     if (dueInfo && half && !(diff(t.due_date!) < 0)) { dueInfo.x = half.text; if (half.late) dueInfo.c = 'over'; }
     const doneOn = t.completed_at ? ymd(new Date(t.completed_at)) : '';
     const bits: React.ReactNode[] = [];
+    const pr = priorityOf(t);
+    if (!isDone) bits.push(<button key="pr" className="mb prb" aria-label={`Priority: ${priorityLabel[pr]}. Change priority`}
+      onClick={e => menuPriority(e.currentTarget, pr, v => void update(t, { pr: v as TaskPriority }))}>{prioPill(pr)}</button>);
     if (hide !== 'p') bits.push(<span key="p" className="mp">{t.project_name || 'No project'}</span>);
     if (hide !== 'who') bits.push(<button key="w" className={`mb${t.employee_id ? '' : ' ph'}`} disabled={!edit}
       onClick={e => menuWho(e.currentTarget, t.employee_id, v => void update(t, { who: v || null }))}>{t.employee_id ? dot(t.employee_id) : I.userS}{t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Assign'}</button>);
     if (isDone) bits.push(<span key="d" className="mp" style={{ color: 'var(--ok)' }}>Done {doneOn === T0 ? 'today' : doneOn ? short(doneOn) : ''}</span>);
-    else if (hide !== 'due' || dueInfo?.c === 'over' || (!!t.half_day && !!dueInfo)) bits.push(<button key="d" className={`mb${dueInfo ? (dueInfo.c ? ` ${dueInfo.c}` : '') : ' ph'}`} disabled={!edit}
+    else if (hide !== 'due' || dueInfo?.c === 'over' || (!!t.half_day && !!dueInfo)) bits.push(<button key="d" className={`mb${dueInfo ? (dueInfo.c ? ` ${dueInfo.c}` : '') : ' ph'}`}
       onClick={e => dueBar(e.currentTarget, (t.half_day && t.due_date === T0 ? HALF : t.due_date ?? null), v => void update(t, { due: v || null }))}>{I.calS}{dueInfo ? dueInfo.x : 'Due date'}</button>);
     if (t.status === 'STUCK') bits.push(<span key="s" className="mp sk">{t.stuck_reason ? `Stuck · ${t.stuck_progress ?? 0}% done` : 'Stuck'}</span>);
     if (t.self_created) bits.push(<span key="o" className="ro">Written by employee</span>);
 
-    const ts = (e: React.TouchEvent) => { Object.assign(sw.current, { x0: e.touches[0].clientX, y0: e.touches[0].clientY, dx: 0, on: false, dead: !edit }); };
+    const ts = (e: React.TouchEvent) => { Object.assign(sw.current, { x0: e.touches[0].clientX, y0: e.touches[0].clientY, dx: 0, on: false, dead: false }); };
     const tm = (e: React.TouchEvent<HTMLDivElement>) => {
       const s = sw.current; if (s.dead) return; const p = parts(e.currentTarget);
       const mx = e.touches[0].clientX - s.x0, my = e.touches[0].clientY - s.y0;
@@ -612,7 +662,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     const te = (e: React.TouchEvent<HTMLDivElement>) => {
       const s = sw.current; if (!s.on) return; const p = parts(e.currentTarget);
       p.row.classList.remove('drag'); p.row.style.transform = ''; p.l.style.opacity = '0'; p.r.style.opacity = '0'; s.at = Date.now(); s.on = false;
-      if (s.dx > 90) void update(t, { s: isDone ? 'NOT_STARTED' : 'END' });
+      if (s.dx > 90) { if (edit || t.employee_id === user.id) void update(t, { s: isDone ? 'NOT_STARTED' : 'END' }); else say('Only the manager who created this task can mark it done'); }
       else if (s.dx < -90) dueBar(p.row.querySelector('.tt') as HTMLElement, (t.half_day && t.due_date === T0 ? HALF : t.due_date ?? null), v => void update(t, { due: v || null }));
     };
     const swiped = () => Date.now() - sw.current.at < 350;
@@ -645,13 +695,15 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       <label className="vh" htmlFor="eT">Task</label>
       <textarea ref={fit} className="ttl-in" id="eT" rows={2} value={text} readOnly={!edit} maxLength={4000}
         onChange={e => setText(e.target.value)} onBlur={saveText} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }} />
-      {!edit && <p className="small">{t.self_created ? 'Written by the employee. Only they can change it.' : 'Created by another manager. Only they can change it.'}</p>}
+      {!edit && <p className="small">{t.self_created ? 'Written by the employee.' : 'Created by another manager.'} You can change its priority and due date; only {t.self_created ? 'they' : 'that manager'} can change the rest.</p>}
       <div className="fields">
         <div className="f"><span>Status</span><button className="fv" disabled={!edit && t.employee_id !== user.id} aria-haspopup="listbox" onClick={e => menuStatus(e.currentTarget, t.status, v => void update(t, { s: v as TaskStatus }))}>{SIC[t.status]}<span>{ST[t.status][0]}</span>{I.down}</button></div>
+        <div className="f"><span>Priority</span><button className="fv" aria-haspopup="listbox" onClick={e => menuPriority(e.currentTarget, priorityOf(t), v => void update(t, { pr: v as TaskPriority }))}>{prioPill(priorityOf(t))}<span>{PR_SUB[priorityOf(t)]}</span>{I.down}</button></div>
         <div className="f"><span>Assigned to</span><button className="fv" disabled={!edit} aria-haspopup="listbox" onClick={e => menuWho(e.currentTarget, t.employee_id, v => void update(t, { who: v || null }))}>{t.employee_id ? dot(t.employee_id) : I.user}<span>{t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Not assigned'}</span>{I.down}</button></div>
         <div className="f"><span>Project</span><button className="fv" disabled={!edit} aria-haspopup="listbox" onClick={e => { const a = e.currentTarget; menuProject(a, t.project_name || '', v => { if (v !== '__new__') void update(t, { p: v }); else newProjectBox(a, n => void update(t, { p: n })); }); }}><span>{t.project_name || 'No project'}</span>{I.down}</button></div>
         <div className="f col"><span>Due date{t.due_date ? ` · ${dshort(t.due_date)}` : ''}</span>
-          {edit ? DueSeg((t.half_day && t.due_date === T0 ? HALF : t.due_date ?? null), v => void update(t, { due: v || null }), !!t.due_date) : <span>{t.due_date ? dshort(t.due_date) : 'No due date'}</span>}</div>
+          {DueSeg((t.half_day && t.due_date === T0 ? HALF : t.due_date ?? null), v => void update(t, { due: v || null }), !!t.due_date)}
+          {!!t.due_changes && <span className="moved">Deadline moved {t.due_changes}×{t.due_changed_by ? ` · last by ${t.due_changed_by === user.id ? 'you' : empName(t.due_changed_by) || 'a manager'}` : ''}{t.due_changed_at ? `, ${short(ymd(new Date(t.due_changed_at)))}` : ''}</span>}</div>
       </div>
       {t.status === 'STUCK' && t.stuck_reason && <div className="stuck-note sheet-stuck"><b>Stuck · {t.stuck_progress ?? 0}% done</b>
         {t.stuck_at && <> · since {new Date(t.stuck_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, {punchTimeLabel(t.stuck_at)}</>}
