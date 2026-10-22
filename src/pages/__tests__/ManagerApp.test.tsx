@@ -50,7 +50,7 @@ vi.mock('../../services/calendar.service', () => ({ calendarService: {
 } }));
 vi.mock('../../services/assignedTask.service', async (orig) => {
   const real = await orig<typeof import('../../services/assignedTask.service')>();
-  return { ...real, assignedTaskService: { setStatus: vi.fn(async () => ({})), listModeSwitcherIds: vi.fn(async () => ['e3']), listProjects: vi.fn(async () => [{ id: 'p2', name: 'KAFD', project_number: 2 }]), createProject: vi.fn(async (n: string) => ({ id: 'p3', name: n, project_number: 3 })), assign: vi.fn(async () => ({ id: 'n1' })), createUnassigned: vi.fn(async () => ({ id: 'n2' })), managerUpdate: vi.fn(async () => ({})), markStuck: vi.fn(async () => ({})), setHalfDay: vi.fn(async () => ({})), setPlan: vi.fn(async () => ({})), managerDelete: vi.fn(async () => {}) } };
+  return { ...real, assignedTaskService: { createRecurring: vi.fn(async () => ({ id: "rec1" })), setRecurrence: vi.fn(async () => {}), setStatus: vi.fn(async () => ({})), listModeSwitcherIds: vi.fn(async () => ['e3']), listProjects: vi.fn(async () => [{ id: 'p2', name: 'KAFD', project_number: 2 }]), createProject: vi.fn(async (n: string) => ({ id: 'p3', name: n, project_number: 3 })), assign: vi.fn(async () => ({ id: 'n1' })), createUnassigned: vi.fn(async () => ({ id: 'n2' })), managerUpdate: vi.fn(async () => ({})), markStuck: vi.fn(async () => ({})), setHalfDay: vi.fn(async () => ({})), setPlan: vi.fn(async () => ({})), managerDelete: vi.fn(async () => {}) } };
 });
 
 const user = { id: 'mgr', name: 'Test Manager', role: 'MANAGER', email: 'tm@example.com' } as any;
@@ -485,5 +485,34 @@ describe('manager app', () => {
     await screen.findByText('Set by Maruthi');
     expect(screen.getByText('No limit · unpaid days are only counted')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Set a limit for one person' })).not.toBeInTheDocument();
+  });
+});
+
+
+describe('recurring tasks', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('creates 20 tasks with their own recurrence calls and resets the composer', async () => {
+    render(<ManagerApp user={user} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: /Project: / }).textContent).not.toBe('Project'));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Repeat weekly' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Tuesday' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Thursday' }));
+    fireEvent.change(screen.getByLabelText('New task'), { target: { value: Array.from({ length: 20 }, (_, i) => `Report ${i + 1}`).join(';') } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(assignedTaskService.createRecurring).toHaveBeenCalledTimes(20));
+    expect(new Set(vi.mocked(assignedTaskService.createRecurring).mock.calls.map(call => call[1])).size).toBe(20);
+    for (const call of vi.mocked(assignedTaskService.createRecurring).mock.calls) expect(call[4]).toEqual([1, 2, 4]);
+    expect(assignedTaskService.createUnassigned).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Repeat weekly' })).not.toBeChecked());
+  });
+
+  it('lets a manager give an existing task an independent schedule', async () => {
+    render(<ManagerApp user={user} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Door schedule update' }));
+    const controls = screen.getAllByRole('group', { name: 'Recurring task' });
+    fireEvent.click(within(controls[controls.length - 1]).getByRole('checkbox', { name: 'Repeat weekly' }));
+    await waitFor(() => expect(assignedTaskService.setRecurrence).toHaveBeenCalledWith('t2', [1]));
+    expect(assignedTaskService.managerUpdate).not.toHaveBeenCalled();
   });
 });

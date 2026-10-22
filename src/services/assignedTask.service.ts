@@ -1,5 +1,10 @@
 import { supabase } from './supabase';
 
+const missingRecurrenceMigration = (error: { code?: string }) => error.code === 'PGRST202';
+const recurrenceErrorMessage = (error: { code?: string; message: string }) => missingRecurrenceMigration(error)
+  ? 'Recurring tasks are not enabled in this database yet. Apply migration 0094_recurring_tasks.sql, then try again.'
+  : error.message;
+
 export type TaskStatus = 'NOT_STARTED' | 'START' | 'PROGRESS' | 'STUCK' | 'END';
 export type TaskPriority = 'HIGH' | 'MEDIUM' | 'LOW';
 export const PRIORITIES: TaskPriority[] = ['HIGH', 'MEDIUM', 'LOW'];
@@ -9,6 +14,9 @@ export const priorityOf = (t: { priority?: TaskPriority | null }): TaskPriority 
 /** Sort key: High first. */
 export const priorityRank = (t: { priority?: TaskPriority | null }) => PRIORITIES.indexOf(priorityOf(t));
 export interface AssignedTask {
+  recurrence_root_id?: string | null;
+  recurrence_days?: number[];
+  occurrence_date?: string | null;
   id: string;
   /** null while the task is unassigned (saved by a manager without a person yet). */
   employee_id: string | null;
@@ -80,15 +88,33 @@ export const assignedTaskService = {
     return row;
   },
   async list(employeeId?: string): Promise<AssignedTask[]> {
+    const { error: recurrenceError } = await supabase.rpc('materialize_recurring_tasks');
+    // Older databases must still be able to load their existing one-off tasks.
+    if (recurrenceError && !missingRecurrenceMigration(recurrenceError)) throw new Error(recurrenceError.message);
     const rows: AssignedTask[] = [];
     for (let offset = 0; ; offset += 500) {
       let query = supabase.from('assigned_tasks').select('*').order('created', { ascending: false }).order('id').range(offset, offset + 499);
-      if (employeeId) query = query.eq('employee_id', employeeId);
+      if (employeeId) {
+        query = query.eq('employee_id', employeeId);
+        if (!recurrenceError) query = query.or(`occurrence_date.is.null,occurrence_date.lte.${new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())}`);
+      }
       const { data, error } = await query;
       if (error) throw new Error(error.message);
       rows.push(...(data || []));
       if (!data || data.length < 500) return rows;
     }
+  },
+  async createRecurring(employeeId: string | null, description: string, projectName: string, dueDate: string, days: number[], status: TaskStatus = 'NOT_STARTED'): Promise<AssignedTask> {
+    const { data, error } = await supabase.rpc('create_recurring_task', {
+      p_employee_id: employeeId, p_description: description.trim(), p_project_name: projectName.trim(),
+      p_start_date: dueDate || null, p_days: days, p_status: status,
+    });
+    if (error) throw new Error(recurrenceErrorMessage(error));
+    return data;
+  },
+  async setRecurrence(taskId: string, days: number[]): Promise<void> {
+    const { error } = await supabase.rpc('set_task_recurrence', { p_task_id: taskId, p_days: days });
+    if (error) throw new Error(recurrenceErrorMessage(error));
   },
   async assign(employeeId: string, description: string, projectName: string, dueDate: string, status: TaskStatus = 'NOT_STARTED'): Promise<AssignedTask> {
     if (!projectName.trim()) throw new Error('Choose or add a project.');

@@ -15,6 +15,7 @@ import { punchTimeLabel } from '../utils/attendanceUtils';
 import './ManagerApp.css';
 import AccountModeSwitch from '../components/AccountModeSwitch';
 import StuckNoteDialog from '../components/tasks/StuckNoteDialog';
+import { RecurrencePicker, recurrenceLabel } from '../components/tasks/RecurrencePicker';
 
 /* Manager app: Tasks / Leaves / Calendar, built from the voxel1-manager.html design on live data. */
 
@@ -252,6 +253,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [cpWho, setCpWho] = useState('');
   const [cpDue, setCpDue] = useState('');
   const [cpPri, setCpPri] = useState<TaskPriority>('MEDIUM');
+  const [cpDays, setCpDays] = useState<number[]>([]);
+  const [recurrenceBusy, setRecurrenceBusy] = useState(false);
   const [tfilter, setTfilter] = useState<TFilter>('all');
   const [text, setText] = useState('');
   const [adding, setAdding] = useState(false);
@@ -536,12 +539,14 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         const created: AssignedTask[] = [];
         const due = dueOf(cpDue);
         for (const d of items) {
-          const c = cpWho ? await assignedTaskService.assign(cpWho, d, project, due, 'NOT_STARTED') : await assignedTaskService.createUnassigned(d, project, due);
+          const c = cpDays.length
+            ? await assignedTaskService.createRecurring(cpWho || null, d, project, due, cpDays)
+            : cpWho ? await assignedTaskService.assign(cpWho, d, project, due, 'NOT_STARTED') : await assignedTaskService.createUnassigned(d, project, due);
           created.push(c);
-          if (cpDue === HALF || cpPri !== 'MEDIUM') await assignedTaskService.setPlan(c.id, { priority: cpPri, dueDate: due || null, halfDay: cpDue === HALF });
+          if ((!cpDays.length && cpDue === HALF) || cpPri !== 'MEDIUM') await assignedTaskService.setPlan(c.id, { priority: cpPri, dueDate: cpDays.length ? c.due_date || null : due || null, halfDay: !cpDays.length && cpDue === HALF });
         }
         const msg = `${items.length > 1 ? `${items.length} tasks added` : 'Added'} · ${project}${cpWho ? ` · ${empName(cpWho)}` : ''}${cpDue ? ` · ${dueWord(cpDue)}` : ''}${cpPri !== 'MEDIUM' ? ` · ${priorityLabel[cpPri]}` : ''}`;
-        setText(''); setCpWho(''); setCpDue(''); setCpPri('MEDIUM');
+        setText(''); setCpWho(''); setCpDue(''); setCpPri('MEDIUM'); setCpDays([]);
         await Promise.all([refresh(), loadProjects()]);
         say(msg, () => { void Promise.all(created.map(c => assignedTaskService.managerDelete(c.id))).then(refresh).catch(fail); });
       } catch (e) { fail(e); } finally { setAdding(false); }
@@ -597,6 +602,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
           <div className="pseg" role="radiogroup" aria-labelledby="cpPriL">{PRIORITIES.map(k =>
             <button key={k} type="button" role="radio" aria-checked={cpPri === k} className={k.toLowerCase()} onClick={() => setCpPri(k)}>{priorityLabel[k]}</button>)}</div>
         </div>
+        <RecurrencePicker days={cpDays} onChange={setCpDays} disabled={adding} />
       </div>
       <div className="tools">
         <button type="button" className="pf" aria-haspopup="listbox" onClick={e => menuProject(e.currentTarget, pfilter, v => setPfilter(v), true)}>
@@ -652,6 +658,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     if (dueInfo && half && !(diff(t.due_date!) < 0)) { dueInfo.x = half.text; if (half.late) dueInfo.c = 'over'; }
     const doneOn = t.completed_at ? ymd(new Date(t.completed_at)) : '';
     const bits: React.ReactNode[] = [];
+    if (t.recurrence_days?.length) bits.push(<span key="repeat" className="mp">{recurrenceLabel(t.recurrence_days)}</span>);
     const pr = priorityOf(t);
     if (!isDone) bits.push(<button key="pr" className="mb prb" aria-label={`Priority: ${priorityLabel[pr]}. Change priority`}
       onClick={e => menuPriority(e.currentTarget, pr, v => void update(t, { pr: v as TaskPriority }))}>{prioPill(pr)}</button>);
@@ -710,6 +717,13 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         onChange={e => setText(e.target.value)} onBlur={saveText} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }} />
       {!edit && <p className="small">{t.self_created ? 'Written by the employee.' : 'Created by another manager.'} You can change its priority and due date; only {t.self_created ? 'they' : 'that manager'} can change the rest.</p>}
       <div className="fields">
+        <RecurrencePicker days={t.recurrence_days || []} disabled={recurrenceBusy} onChange={days => {
+          if (recurrenceBusy) return;
+          setRecurrenceBusy(true);
+          void assignedTaskService.setRecurrence(t.id, days).then(refresh)
+            .then(() => say(days.length ? 'Recurrence updated for future occurrences' : 'Future recurrence stopped'))
+            .catch(fail).finally(() => setRecurrenceBusy(false));
+        }} />
         <div className="f"><span>Status</span><button className="fv" disabled={!edit && t.employee_id !== user.id} aria-haspopup="listbox" onClick={e => menuStatus(e.currentTarget, t.status, v => void update(t, { s: v as TaskStatus }))}>{SIC[t.status]}<span>{ST[t.status][0]}</span>{I.down}</button></div>
         <div className="f"><span>Priority</span><button className="fv" aria-haspopup="listbox" onClick={e => menuPriority(e.currentTarget, priorityOf(t), v => void update(t, { pr: v as TaskPriority }))}>{prioPill(priorityOf(t))}<span>{PR_SUB[priorityOf(t)]}</span>{I.down}</button></div>
         <div className="f"><span>Assigned to</span><button className="fv" disabled={!edit} aria-haspopup="listbox" onClick={e => menuWho(e.currentTarget, t.employee_id, v => void update(t, { who: v || null }))}>{t.employee_id ? dot(t.employee_id) : I.user}<span>{t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Not assigned'}</span>{I.down}</button></div>

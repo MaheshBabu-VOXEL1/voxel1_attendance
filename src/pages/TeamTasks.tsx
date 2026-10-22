@@ -4,6 +4,7 @@ import { employeeService } from '../services/employee.service';
 import { assignedTaskService, statusLabel, TaskStatus } from '../services/assignedTask.service';
 import { useAssignedTasks } from '../hooks/useAssignedTasks';
 import { AssignedTaskList } from '../components/tasks/AssignedTaskList';
+import { RecurrencePicker } from '../components/tasks/RecurrencePicker';
 import { Download } from 'lucide-react';
 import { MonthlyReportDownload } from '../components/reports/MonthlyReportDownload';
 import { downloadWorkbook, indiaDate, taskSheet } from '../utils/monthlyReports';
@@ -15,6 +16,7 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
   const [description, setDescription] = useState('');
   const [project, setProject] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
   const [status, setStatus] = useState<TaskStatus>('NOT_STARTED');
   const [newProject, setNewProject] = useState('');
   const [projectFilter, setProjectFilter] = useState('');
@@ -57,12 +59,16 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
       const existingProject = projects.find(name => name.toLowerCase() === projectName.toLowerCase()) || projectName;
       if (!employeeId) {
         // Saved for later: keep the project selected so the next task of the day is quicker to add.
-        await assignedTaskService.createUnassigned(description, existingProject, dueDate);
+        if (recurrenceDays.length) await assignedTaskService.createRecurring(null, description, existingProject, dueDate, recurrenceDays);
+        else await assignedTaskService.createUnassigned(description, existingProject, dueDate);
+        setRecurrenceDays([]);
         setDescription(''); setDueDate(''); setProject(existingProject); setNewProject('');
         setMessage('Task saved as unassigned. Choose a person for it below when you are ready.'); await refresh();
         return;
       }
-      await assignedTaskService.assign(employeeId, description, existingProject, dueDate, status);
+      if (recurrenceDays.length) await assignedTaskService.createRecurring(employeeId, description, existingProject, dueDate, recurrenceDays, status);
+      else await assignedTaskService.assign(employeeId, description, existingProject, dueDate, status);
+      setRecurrenceDays([]);
       setDueDate(''); setStatus('NOT_STARTED'); setDescription(''); setProject(''); setNewProject(''); setProjectFilter(''); setMessage('Task assigned. Your employee can now see it.'); await refresh(); setTab('PROGRESS');
     } catch (e) { setFormError(e instanceof Error ? e.message : 'Could not save task.'); }
     finally { setSaving(false); }
@@ -118,6 +124,7 @@ export default function TeamTasks({ user, initialTab }: { user: User; initialTab
         </table>
       </div>
       {!employeesLoading && !employees.length && <p className="text-sm text-slate-500">No active employees assigned to you yet.</p>}
+      <RecurrencePicker days={recurrenceDays} onChange={setRecurrenceDays} disabled={saving} />
       {(formError || error) && <p role="alert" className="text-sm text-red-600">{formError || error}</p>}
       <button type="submit" disabled={saving || loading || !description.trim() || !projectName} className="min-h-12 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Saving…' : employeeId ? 'Assign Task' : 'Save as unassigned'}</button>
     </form>

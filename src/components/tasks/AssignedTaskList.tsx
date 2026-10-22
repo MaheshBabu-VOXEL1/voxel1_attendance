@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { recurrenceLabel } from './RecurrencePicker';
 import { taskStatusStyles } from '../../utils/taskStatusStyles';
 import { AssignedTask, assignedTaskService, statusLabel, TaskStatus } from '../../services/assignedTask.service';
 
@@ -26,6 +27,7 @@ export function AssignedTaskList({ tasks, editable = false, onUpdated, emptyText
       {task.project_number != null && <p className="text-xs text-slate-500">Project UID: {task.project_number}</p>}
       {task.due_date && <p className="text-xs font-medium text-slate-600">Due: {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-GB')}</p>}
       <p className="whitespace-pre-wrap break-words text-sm text-slate-800">{task.description}</p>
+      {!!task.recurrence_days?.length && <p className="text-xs text-slate-500">{recurrenceLabel(task.recurrence_days)}</p>}
       <p className="text-xs text-slate-500">{task.self_created ? 'Sent' : 'Assigned'} {new Date(task.created).toLocaleString()}</p>
       {editable && <fieldset disabled={saving !== null} className="flex flex-wrap gap-3">
         <legend className="mb-2 text-xs font-semibold text-slate-600">Update your task status</legend>
