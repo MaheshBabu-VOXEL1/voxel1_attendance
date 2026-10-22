@@ -31,6 +31,8 @@ export const OFFICE_LOCATIONS = [
   // Sabitha Nagar, Kokapet, Narsingi, Telangana 500075 (Plus Code 98X8+27).
   { name: "My Home Grava Site Office", lat: 17.3975051, lng: 78.3157152, radius: 800 },
   { name: "HITEC City Office", lat: 17.4484603, lng: 78.3828482, radius: GEOFENCE_RADIUS_M },
+  { name: "Hyderabad Office (Madhapur)", lat: 17.445888, lng: 78.397484, radius: GEOFENCE_RADIUS_M },
+  { name: "Aparna Serene Park Site", lat: 17.4629594, lng: 78.3380491, radius: GEOFENCE_RADIUS_M },
 ];
 
 export const DEFAULT_LEAVE_TYPES: CustomLeaveType[] = [

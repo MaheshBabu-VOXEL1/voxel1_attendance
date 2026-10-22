@@ -18,6 +18,7 @@ export const changelog: ChangelogRelease[] = [
     date: '2026-10-22',
     title: 'HITEC City attendance location',
     entries: [
+      { type: 'feature', description: 'Restored Madhapur office and added Aparna Serene Park Site at 17.4629594, 78.3380491, each with a 200 m attendance radius. Four sites are now enabled; migration 0096 applies the same server rules.' },
       { type: 'feature', description: 'Added HITEC City Office at 17.4484603, 78.3828482 with a 200 m attendance radius alongside the existing Grava site (800 m). Migration 0095 applies the same location rules on the server.' },
     ],
   },

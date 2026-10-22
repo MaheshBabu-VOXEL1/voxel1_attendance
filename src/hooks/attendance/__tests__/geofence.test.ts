@@ -4,15 +4,14 @@ import { classifySyncError } from '../../../services/attendance/syncQueue';
 import { OFFICE_LOCATIONS } from '../../../constants';
 
 describe('Grava attendance site', () => {
-  it('allows the site, 605 m and 799 m away, but rejects 801 m away and the old office', () => {
+  it('allows the site, 605 m and 799 m away, but rejects 801 m away', () => {
     const site = OFFICE_LOCATIONS[0];
     const north = (metres: number) => site.lat + metres / 6371000 * 180 / Math.PI;
-    expect(OFFICE_LOCATIONS).toHaveLength(2);
+    expect(OFFICE_LOCATIONS).toHaveLength(4);
     expect(computeGeofence(17.3975051, 78.3157152, OFFICE_LOCATIONS)?.inside).toBe(true);
     expect(computeGeofence(north(605), site.lng, OFFICE_LOCATIONS)?.inside).toBe(true);
     expect(computeGeofence(north(799), site.lng, OFFICE_LOCATIONS)?.inside).toBe(true);
     expect(computeGeofence(north(801), site.lng, OFFICE_LOCATIONS)?.inside).toBe(false);
-    expect(computeGeofence(17.445888, 78.397484, OFFICE_LOCATIONS)?.inside).toBe(false);
   });
 });
 
@@ -30,6 +29,18 @@ describe('HITEC City attendance site', () => {
 });
 
 // Two offices ~1.1 km apart on the same latitude.
+describe('restored Madhapur and Aparna Serene Park sites', () => {
+  it.each(OFFICE_LOCATIONS.slice(2))('allows $name within 200 m only', site => {
+    const north = (metres: number) => site.lat + metres / 6371000 * 180 / Math.PI;
+    const result = computeGeofence(site.lat, site.lng, OFFICE_LOCATIONS);
+    expect(result?.officeName).toBe(site.name);
+    expect(result?.inside).toBe(true);
+    expect(result?.radiusM).toBe(200);
+    expect(computeGeofence(north(199), site.lng, OFFICE_LOCATIONS)?.inside).toBe(true);
+    expect(computeGeofence(north(201), site.lng, OFFICE_LOCATIONS)?.inside).toBe(false);
+  });
+});
+
 const SMALL = { name: 'Small', lat: 17.0, lng: 78.0, radius: 100 };
 const BIG = { name: 'Big', lat: 17.0, lng: 78.0105, radius: 1500 };
 
