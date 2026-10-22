@@ -8,7 +8,7 @@ export const PWAUpdateBanner: React.FC = () => {
   if (!needRefresh && !offlineReady) return null;
 
   return (
-    <div className="fixed bottom-20 md:bottom-6 left-4 right-4 md:left-auto md:right-6 md:w-96 z-[100] animate-in slide-in-from-bottom-4">
+    <div className="fixed bottom-20 md:bottom-6 left-4 right-4 md:left-auto md:right-6 md:w-96 z-[11000] animate-in slide-in-from-bottom-4">
       <div className="bg-white border border-slate-200 rounded-2xl shadow-xl p-4 flex items-center gap-4">
         <div className="p-2.5 bg-primary/10 rounded-xl flex-shrink-0">
           <RefreshCw size={20} className={`text-primary ${isUpdating ? 'animate-spin' : ''}`} />
