@@ -29,7 +29,7 @@ export const GEOFENCE_RADIUS_M = 200;
 export const OFFICE_LOCATIONS = [
   // Attendance is restricted to this site, regardless of other saved office settings.
   // Sabitha Nagar, Kokapet, Narsingi, Telangana 500075 (Plus Code 98X8+27).
-  { name: "My Home Grava Site Office", lat: 17.3975051, lng: 78.3157152, radius: 600 },
+  { name: "My Home Grava Site Office", lat: 17.3975051, lng: 78.3157152, radius: 800 },
 ];
 
 export const DEFAULT_LEAVE_TYPES: CustomLeaveType[] = [
