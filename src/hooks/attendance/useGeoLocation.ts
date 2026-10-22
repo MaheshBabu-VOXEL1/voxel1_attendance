@@ -1,7 +1,6 @@
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { OFFICE_LOCATIONS, GEOFENCE_RADIUS_M } from '../../constants';
-import { hrService } from '../../services/hrService';
 import { OfficeLocation } from '../../types';
 
 export interface GeofenceStatus {
@@ -83,23 +82,9 @@ export const useGeoLocation = () => {
   const [location, setLocation] = useState<{ lat: number; lng: number; address: string } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [geoFences, setGeoFences] = useState<OfficeLocation[]>(OFFICE_LOCATIONS);
+  const geoFences = OFFICE_LOCATIONS;
   const [geofence, setGeofence] = useState<GeofenceStatus | null>(null);
   const watchIdRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const loadConfig = async () => {
-      try {
-        const config = await hrService.getConfig();
-        if (config.officeLocations && config.officeLocations.length > 0) {
-          setGeoFences(config.officeLocations);
-        }
-      } catch (e) {
-        // Fallback to constants is already set
-      }
-    };
-    loadConfig();
-  }, []);
 
   const matchOffice = (lat: number, lng: number, fences: OfficeLocation[]): string | null => {
     const fence = computeGeofence(lat, lng, fences);

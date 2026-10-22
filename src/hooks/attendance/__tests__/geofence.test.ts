@@ -1,6 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { computeGeofence, distanceMeters, officeRadius } from '../useGeoLocation';
 import { classifySyncError } from '../../../services/attendance/syncQueue';
+import { OFFICE_LOCATIONS } from '../../../constants';
+
+describe('Grava attendance site', () => {
+  it('allows the site and 599 m away, but rejects 601 m away and the old office', () => {
+    const site = OFFICE_LOCATIONS[0];
+    const north = (metres: number) => site.lat + metres / 6371000 * 180 / Math.PI;
+    expect(OFFICE_LOCATIONS).toHaveLength(1);
+    expect(computeGeofence(17.3975051, 78.3157152, OFFICE_LOCATIONS)?.inside).toBe(true);
+    expect(computeGeofence(north(599), site.lng, OFFICE_LOCATIONS)?.inside).toBe(true);
+    expect(computeGeofence(north(601), site.lng, OFFICE_LOCATIONS)?.inside).toBe(false);
+    expect(computeGeofence(17.445888, 78.397484, OFFICE_LOCATIONS)?.inside).toBe(false);
+  });
+});
 
 // Two offices ~1.1 km apart on the same latitude.
 const SMALL = { name: 'Small', lat: 17.0, lng: 78.0, radius: 100 };
