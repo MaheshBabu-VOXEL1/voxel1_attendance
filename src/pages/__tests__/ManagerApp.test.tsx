@@ -72,6 +72,17 @@ describe('manager app', () => {
     expect(screen.getByText(/Created by another manager\. You can change its priority and due date/)).toBeInTheDocument();
   });
 
+  it('filters to the tasks everyone is working on (Started or In progress)', async () => {
+    render(<ManagerApp user={user} />);
+    const chip = within(screen.getByRole('group', { name: 'Filter tasks' })).getByRole('button', { name: /In progress/ });
+    expect(chip).toHaveTextContent('2');
+    fireEvent.click(chip);
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Review shaft sizes')).toBeInTheDocument();
+    expect(screen.getByText('Own note')).toBeInTheDocument();
+    expect(screen.queryByText('Door schedule update')).not.toBeInTheDocument();
+  });
+
   it('finds shared tasks by the assigner name', async () => {
     render(<ManagerApp user={user} />);
     fireEvent.click(screen.getByRole('button', { name: 'Search tasks' }));

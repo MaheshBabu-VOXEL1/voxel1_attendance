@@ -21,7 +21,7 @@ import { RecurrencePicker, recurrenceLabel } from '../components/tasks/Recurrenc
 
 type Route = 'tasks' | 'leaves' | 'attendance';
 type Group = 'date' | 'person' | 'project';
-type TFilter = 'all' | 'today' | 'overdue' | 'high' | 'stuck' | 'mine' | 'byme';
+type TFilter = 'all' | 'progress' | 'today' | 'overdue' | 'high' | 'stuck' | 'mine' | 'byme';
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
 const MONL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -509,6 +509,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     const isOver = (t: AssignedTask) => (!!t.due_date && t.due_date < T0) || halfDayLate(t, now);
     const FILTERS: [TFilter, string, (t: AssignedTask) => boolean][] = [
       ['all', 'All', () => true],
+      // What everyone is working on right now: Started counts too, as on the employee screen.
+      ['progress', 'In progress', t => t.status === 'START' || t.status === 'PROGRESS'],
       ['today', 'Due today', t => t.due_date === T0 && !halfDayLate(t, now)],
       ['overdue', 'Overdue', isOver],
       ['high', 'High priority', t => priorityOf(t) === 'HIGH'],

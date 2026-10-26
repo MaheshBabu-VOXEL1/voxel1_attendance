@@ -15,6 +15,13 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-10-26',
+    title: 'In progress filter for managers',
+    entries: [
+      { type: 'feature', description: 'Manager app Tasks: new "In progress" filter chip shows, with a count, every task someone is working on right now (Started or In progress), so managers can see the whole team\'s live work at a glance.' },
+    ],
+  },
+  {
     date: '2026-10-22',
     title: 'HITEC City attendance location',
     entries: [
