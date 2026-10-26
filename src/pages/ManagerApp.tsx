@@ -278,6 +278,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [searchOn, setSearchOn] = useState(false);
   const [q, setQ] = useState('');
   const [showDone, setShowDone] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState('');
   const [calY, setCalY] = useState(() => new Date().getFullYear());
   const [calM, setCalM] = useState(() => new Date().getMonth());
@@ -431,7 +432,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
 
   // ---------- render ----------
   const canDecideLeave = approver || user.role === 'ADMIN';
-  const waitingLeaves = leaves.filter(l => l.status === 'PENDING_MANAGER').sort((a, b) => a.startDate.localeCompare(b.startDate));
+  // A request whose dates have passed without a decision goes to the archive, not here.
+  const waitingLeaves = leaves.filter(l => l.status === 'PENDING_MANAGER' && l.endDate >= T0).sort((a, b) => a.startDate.localeCompare(b.startDate));
   // Only the approver gets the badge and the "waiting for you" count.
   const pendingLeaves = canDecideLeave ? waitingLeaves : [];
 
@@ -745,7 +747,14 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   function LeavesView() {
     const busy = leaveBusy, setBusy = setLeaveBusy;
     const off = leaves.filter(l => l.status === 'APPROVED' && l.startDate <= T0 && l.endDate >= T0);
-    const recent = leaves.filter(l => (l.status === 'APPROVED' || l.status === 'REJECTED') && l.endDate >= rd(-14)).sort((a, b) => b.startDate.localeCompare(a.startDate));
+    // The approver gets every leave whose end date has passed in a month-wise archive; the main list keeps current and upcoming ones.
+    const recent = leaves.filter(l => (l.status === 'APPROVED' || l.status === 'REJECTED') && l.endDate >= (canDecideLeave ? T0 : rd(-14))).sort((a, b) => b.startDate.localeCompare(a.startDate));
+    const archive = canDecideLeave ? leaves.filter(l => l.endDate < T0).sort((a, b) => b.startDate.localeCompare(a.startDate)) : [];
+    const months: [string, LeaveRequest[]][] = [];
+    archive.forEach(l => {
+      const d = parse(l.startDate), m = `${MONL[d.getMonth()]} ${d.getFullYear()}`;
+      if (months[months.length - 1]?.[0] === m) months[months.length - 1][1].push(l); else months.push([m, [l]]);
+    });
     const decide = async (l: LeaveRequest, status: 'APPROVED' | 'REJECTED') => {
       setBusy(l.id);
       try {
@@ -787,6 +796,15 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         <div className="t"><b>{l.employeeName}</b><span>{typeName(l.type)} · {range(l.startDate, l.endDate)}</span></div>
         {l.status === 'APPROVED' ? <span className="st ok">{I.check}Approved</span> : <span className="st bad">{I.cross}Rejected</span>}</div>)
         : <div className="empty">None yet</div>}</div>
+      {archive.length > 0 && <>
+        <button className="more" aria-expanded={showArchive} onClick={() => setShowArchive(!showArchive)}>{showArchive ? 'Hide' : 'Show'} archive ({archive.length})</button>
+        {showArchive && months.map(([m, ls]) => <React.Fragment key={m}>
+          <div className="sec"><h2>{m}</h2><span>{ls.length}</span></div>
+          <div className="list">{ls.map(l => <div className="rw" key={l.id}><span className="av sm">{ini(l.employeeName)}</span>
+            <div className="t"><b>{l.employeeName}</b><span>{typeName(l.type)} · {range(l.startDate, l.endDate)}</span></div>
+            {l.status === 'APPROVED' ? <span className="st ok">{I.check}Approved</span> : l.status === 'REJECTED' ? <span className="st bad">{I.cross}Rejected</span> : <span className="st warn">Not decided</span>}</div>)}</div>
+        </React.Fragment>)}
+      </>}
       {unpaidOv && UnpaidLimits(unpaidOv)}
     </>;
   }

@@ -16,8 +16,9 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-10-26',
-    title: 'In progress filter for managers',
+    title: 'In progress filter and leave archive for managers',
     entries: [
+      { type: 'feature', description: 'Manager app Leaves: leaves whose end date has passed move into a month-wise Archive (newest month first, collapsed behind "Show archive"), showing Approved, Rejected or Not decided. Only the leave approver sees it; expired undecided requests no longer sit in "Waiting for you".' },
       { type: 'feature', description: 'Manager app Tasks: new "In progress" filter chip shows, with a count, every task someone is working on right now (Started or In progress), so managers can see the whole team\'s live work at a glance.' },
     ],
   },
