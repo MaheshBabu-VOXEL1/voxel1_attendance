@@ -124,7 +124,7 @@ export interface LeaveRequest {
   endDate: string;
   totalDays: number;
   reason: string;
-  status: 'PENDING_MANAGER' | 'PENDING_HR' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING_MANAGER' | 'PENDING_HR' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
   appliedDate: string;
   approverRemarks?: string;
   managerRemarks?: string;

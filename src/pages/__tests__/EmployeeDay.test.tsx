@@ -4,23 +4,23 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import EmployeeDay from '../EmployeeDay';
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ login: vi.fn() }) }));
 vi.mock('../../services/supabase', async (original) => { const actual = await original<typeof import('../../services/supabase')>(); return { ...actual, supabase: { ...actual.supabase, rpc: vi.fn(async () => ({ data: false, error: null })) } }; });
-const mocks = vi.hoisted(() => ({ status: vi.fn(), stuck: vi.fn(), leave: vi.fn(), refresh: vi.fn(), extra: [] as any[], unpaid: null as any }));
+const mocks = vi.hoisted(() => ({ status: vi.fn(), stuck: vi.fn(), leave: vi.fn(), refresh: vi.fn(), extra: [] as any[], unpaid: null as any, leaves: [] as any[], active: {checkIn:'09:00'} as any }));
 vi.mock('../../context/ThemeContext', () => ({ useTheme: () => ({ darkMode: false }) }));
 vi.mock('../../context/SubscriptionContext', () => ({ useSubscription: () => ({ canPerformAction: () => true }) }));
 vi.mock('../../services/assignedTask.service', async (original) => ({ ...(await original<typeof import('../../services/assignedTask.service')>()), assignedTaskService: { setStatus: mocks.status, markStuck: mocks.stuck } }));
 vi.mock('../../services/employeeService', () => ({ employeeService: { applyForLeave: mocks.leave } }));
 vi.mock('../../hooks/useAssignedTasks', () => ({ useAssignedTasks: () => ({ loading: false, error: '', refresh: mocks.refresh, tasks: [{id:'task1',description:'Review model',project_name:'Vyoma',created:'2026-10-01T09:00:00Z',status:'START',completed_at:null}, {id:'task2',description:'Old drawing',status:'END',completed_at:'2020-01-01T10:00:00Z'}, ...mocks.extra] }) }));
 vi.mock('../../services/hrService', () => ({ hrService: {
-  getLeaveBalance: async () => ({CASUAL_SICK:12,PAID:7}), getLeaves: async () => [],
+  getLeaveBalance: async () => ({CASUAL_SICK:12,PAID:7}), getLeaves: async () => mocks.leaves,
   getLeaveTypes: async () => [{id:'CASUAL_SICK',name:'Casual & Sick Leave',color:'',hasBalance:true},{id:'PAID',name:'Paid Leave',color:'',hasBalance:true},{id:'UNPAID',name:'Unpaid Leave',color:'',hasBalance:false}],
-  getActiveAttendance: async () => ({checkIn:'09:00'}), getAttendance: async () => [],
+  getActiveAttendance: async () => mocks.active, getAttendance: async () => [],
   getConfig: async () => ({workingDays:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']}),
   resolveShiftForEmployee: async () => null, getHolidays: async () => [],
   getUnpaidLeaveOverview: async () => { if (!mocks.unpaid) throw new Error('missing'); return mocks.unpaid; },
 } }));
 describe('employee reference screen', () => {
   beforeEach(() => {
-    vi.clearAllMocks(); mocks.extra.length = 0; mocks.unpaid = null;
+    vi.clearAllMocks(); mocks.extra.length = 0; mocks.unpaid = null; mocks.leaves = []; mocks.active = {checkIn:'09:00'};
     HTMLDialogElement.prototype.showModal = function() { this.setAttribute('open',''); };
     HTMLDialogElement.prototype.close = function() { this.removeAttribute('open'); };
   });
@@ -68,6 +68,20 @@ describe('employee reference screen', () => {
     fireEvent.click(screen.getByText('Pause'));
     await waitFor(() => expect(mocks.status).toHaveBeenCalledWith('task1','NOT_STARTED'));
     await screen.findByText('Connection failed'); expect(screen.queryByText('Paused')).toBeNull();
+  });
+  it('says checking in gives a leave day back, and hides cancelled requests from upcoming', async () => {
+    const now = new Date(), iso = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    mocks.active = null;
+    mocks.leaves = [
+      { id:'l1', employeeId:'me', type:'PAID', startDate:iso, endDate:iso, totalDays:1, status:'APPROVED' },
+      { id:'l2', employeeId:'me', type:'CASUAL_SICK', startDate:iso, endDate:iso, totalDays:0, status:'CANCELLED' },
+    ];
+    render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
+    expect(await screen.findByText('On leave today · checking in gives the day back')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Apply leave'));
+    const upc = document.querySelector('.sheet .upc')!;
+    expect(upc.querySelectorAll('.lv')).toHaveLength(1);
+    expect(upc.textContent).toContain('Paid leave'); expect(upc.textContent).not.toContain('Pending');
   });
   it('submits leave from the check-in card with the signed-in employee', async () => {
     render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);

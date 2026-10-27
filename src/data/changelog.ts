@@ -16,8 +16,10 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-10-27',
-    title: 'Holidays give leave days back',
+    title: 'Holidays and check-ins give leave days back',
     entries: [
+      { type: 'feature', description: 'Checking in on a leave day gives that day back: an approved or waiting one-day leave is cancelled and a longer one gets one day shorter, with a bell notification. A second check-in the same day, or a holiday added later, never takes the day off twice. The employee home screen says "On leave today · checking in gives the day back" before they check in. Migration 0098.' },
+      { type: 'fix', description: 'Employee leave sheet: cancelled requests no longer appear under "Upcoming leave requests" as Pending.' },
       { type: 'feature', description: 'Manager calendar: adding a company holiday, even for a past date, now takes that day off every approved or waiting leave that covers it. A one-day leave is cancelled and a longer leave gets one day shorter, so the day goes back to the employee\'s balance, and each person gets a bell notification. Removing the holiday (after a confirmation) puts the day back. Migration 0097.' },
       { type: 'fix', description: 'Account-switch members such as Kesari (stored as Employee) can now add and remove holidays and events from the manager calendar; before, saving failed with "Only active managers and admins".' },
     ],
