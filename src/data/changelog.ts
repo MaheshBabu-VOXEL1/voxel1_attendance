@@ -15,6 +15,14 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-10-27',
+    title: 'Holidays give leave days back',
+    entries: [
+      { type: 'feature', description: 'Manager calendar: adding a company holiday, even for a past date, now takes that day off every approved or waiting leave that covers it. A one-day leave is cancelled and a longer leave gets one day shorter, so the day goes back to the employee\'s balance, and each person gets a bell notification. Removing the holiday (after a confirmation) puts the day back. Migration 0097.' },
+      { type: 'fix', description: 'Account-switch members such as Kesari (stored as Employee) can now add and remove holidays and events from the manager calendar; before, saving failed with "Only active managers and admins".' },
+    ],
+  },
+  {
     date: '2026-10-26',
     title: 'In progress filter and leave archive for managers',
     entries: [

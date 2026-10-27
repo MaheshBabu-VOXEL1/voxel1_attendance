@@ -852,21 +852,24 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       const out: Item[] = [];
       holidayOn(d).forEach(h => out.push({ k: 'hd', t: h.name, sub: 'Holiday', id: h.id, removable: !h.isGovernment }));
       events.filter(e => e.event_date === d).forEach(e => out.push({ k: 'ev', t: e.title, sub: 'Event', id: e.id, removable: true }));
-      if (isWk(parse(d))) leaves.filter(l => l.status === 'APPROVED' && l.startDate <= d && l.endDate >= d)
+      if (isWk(parse(d)) && !holidayOn(d).length) leaves.filter(l => l.status === 'APPROVED' && l.startDate <= d && l.endDate >= d)
         .forEach(l => out.push({ k: 'lv', t: l.employeeName, sub: `${typeName(l.type)} leave${l.startDate !== l.endDate ? ` · ${range(l.startDate, l.endDate)}` : ''}` }));
       const o = { hd: 0, ev: 1, lv: 2 }; return out.sort((a, b) => o[a.k] - o[b.k]);
     };
-    const removeItem = async (x: Item) => {
+    const removeItem = async (x: Item, d: string) => {
+      if (x.k === 'hd' && !window.confirm(`Remove the holiday “${x.t}” on ${dshort(d)}? Leave on that day will count it again.`)) return;
       try {
-        if (x.k === 'ev') await calendarService.deleteEvent(x.id!); else await calendarService.deleteHoliday(x.id!);
-        await loadCalendar(); say(`${x.t} removed`);
+        if (x.k === 'ev') { await calendarService.deleteEvent(x.id!); await loadCalendar(); say(`${x.t} removed`); return; }
+        const changed = await calendarService.deleteHoliday(x.id!);
+        await Promise.all([loadCalendar(), loadLeaves()]);
+        say(`${x.t} removed${changed ? ` · ${plural(changed, 'leave')} updated` : ''}`);
       } catch (e) { fail(e); }
     };
-    const agRow = (x: Item, i: number) => <div className="ag" key={`${x.k}-${x.id || x.t}-${i}`}>
+    const agRow = (d: string) => (x: Item, i: number) => <div className="ag" key={`${x.k}-${x.id || x.t}-${i}`}>
       <span className="bar2" style={{ background: x.k === 'lv' ? 'var(--steel)' : x.k === 'ev' ? 'var(--go)' : '#D07A1E' }} />
       {x.k === 'lv' && <span className="av sm">{ini(x.t)}</span>}
       <div className="t"><b>{x.t}</b><span>{x.sub}</span></div>
-      {x.removable && <button className="btn ghost" style={{ color: 'var(--muted)', height: 36, padding: '0 10px' }} onClick={() => void removeItem(x)}>Remove</button>}
+      {x.removable && <button className="btn ghost" style={{ color: 'var(--muted)', height: 36, padding: '0 10px' }} onClick={() => void removeItem(x, d)}>Remove</button>}
     </div>;
     const first = new Date(calY, calM, 1), offset = (first.getDay() + 6) % 7, start = addDays(first, -offset), last = new Date(calY, calM + 1, 0);
     const cells = Math.ceil((offset + last.getDate()) / 7) * 7;
@@ -878,7 +881,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     const upcoming: React.ReactNode[] = []; let n = 0;
     for (let k = 1; k <= 14; k++) {
       const ds = ymd(addDays(parse(selDay), k)), its = itemsOn(ds); if (!its.length) continue; n += its.length;
-      upcoming.push(<div className="agd" key={`d-${ds}`}>{dshort(ds)}</div>, ...its.map(agRow));
+      upcoming.push(<div className="agd" key={`d-${ds}`}>{dshort(ds)}</div>, ...its.map(agRow(ds)));
     }
     return <>
       <div className="card">
@@ -901,7 +904,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         <div className="legend"><span><i className="k-lv" />Leave</span><span><i className="k-ev" />Event</span><span><i className="k-hd" />Holiday</span></div>
       </div>
       <div className="sec"><h2>{selDay === T0 ? 'Today · ' : ''}{dshort(selDay)}</h2><span>{sel.length || ''}</span></div>
-      <div className="list">{sel.length ? sel.map(agRow) : <div className="empty">Nothing on this day</div>}</div>
+      <div className="list">{sel.length ? sel.map(agRow(selDay)) :<div className="empty">Nothing on this day</div>}</div>
       <div className="sec"><h2>Next 2 weeks</h2><span>{n || ''}</span></div>
       <div className="list">{upcoming.length ? upcoming : <div className="empty">Nothing planned</div>}</div>
     </>;
@@ -912,8 +915,10 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     const go = async () => {
       setBusy(true);
       try {
-        if (k === 'ev') await calendarService.addEvent(title, date); else await calendarService.addHoliday(title, date);
-        await loadCalendar(); setSheet(null); say(`${title.trim()} added · ${dshort(date)}`);
+        if (k === 'ev') { await calendarService.addEvent(title, date); await loadCalendar(); setSheet(null); say(`${title.trim()} added · ${dshort(date)}`); return; }
+        const changed = await calendarService.addHoliday(title, date);
+        await Promise.all([loadCalendar(), loadLeaves()]); setSheet(null);
+        say(`${title.trim()} added · ${dshort(date)}${changed ? ` · ${plural(changed, 'leave')} given back` : ''}`);
       } catch (e) { fail(e); } finally { setBusy(false); }
     };
     return <>
@@ -926,7 +931,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       <input className="inp" id="evT" placeholder={k === 'ev' ? 'e.g. Client review' : 'e.g. Company day off'} autoComplete="off" maxLength={200} value={title} onChange={e => setTitle(e.target.value)} />
       <label className="lab" htmlFor="evD" style={{ marginTop: 14 }}>Date</label>
       <input className="inp" type="date" id="evD" value={date} onChange={e => setDate(e.target.value)} />
-      {k === 'hd' && <p className="small">Holidays are shared with the whole company and are not counted as working days for leave.</p>}
+      {k === 'hd' && <p className="small">Holidays are shared with the whole company and never count as leave. Anyone already on leave that day, approved or waiting, gets the day back in their balance, even for a past date.</p>}
       <button className="btn pri lg wide" style={{ marginTop: 18 }} disabled={!title.trim() || !date || busy} onClick={() => void go()}>{busy ? 'Adding…' : 'Add to calendar'}</button>
     </>;
   }

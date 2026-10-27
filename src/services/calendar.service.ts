@@ -20,14 +20,18 @@ export const calendarService = {
     const { error } = await supabase.rpc('delete_calendar_event', { p_id: id });
     if (error) throw new Error(error.message);
   },
-  async addHoliday(name: string, date: string): Promise<void> {
-    const { error } = await supabase.rpc('add_org_holiday', { p_name: name.trim(), p_date: date });
+  /** Adds a company holiday; leave already covering that day gets the day back. Returns how many leaves changed. */
+  async addHoliday(name: string, date: string): Promise<number> {
+    const { data, error } = await supabase.rpc('add_org_holiday', { p_name: name.trim(), p_date: date });
     if (error) throw new Error(error.message);
     organizationService.clearCache();
+    return typeof data === 'number' ? data : 0;
   },
-  async deleteHoliday(id: string): Promise<void> {
-    const { error } = await supabase.rpc('delete_org_holiday', { p_id: id });
+  /** Removes a company holiday; leave covering that day counts it again. Returns how many leaves changed. */
+  async deleteHoliday(id: string): Promise<number> {
+    const { data, error } = await supabase.rpc('delete_org_holiday', { p_id: id });
     if (error) throw new Error(error.message);
     organizationService.clearCache();
+    return typeof data === 'number' ? data : 0;
   },
 };

@@ -46,7 +46,7 @@ vi.mock('../../services/hrService', () => ({ hrService: {
   getAttendance: vi.fn(async () => []),
 } }));
 vi.mock('../../services/calendar.service', () => ({ calendarService: {
-  listEvents: vi.fn(async () => []), addEvent: vi.fn(async () => ({})), deleteEvent: vi.fn(), addHoliday: vi.fn(), deleteHoliday: vi.fn(async () => {}),
+  listEvents: vi.fn(async () => []), addEvent: vi.fn(async () => ({})), deleteEvent: vi.fn(), addHoliday: vi.fn(async () => 0), deleteHoliday: vi.fn(async () => 0),
 } }));
 vi.mock('../../services/assignedTask.service', async (orig) => {
   const real = await orig<typeof import('../../services/assignedTask.service')>();
@@ -450,6 +450,23 @@ describe('manager app', () => {
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Client review' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add to calendar' }));
     await waitFor(() => expect(calendarService.addEvent).toHaveBeenCalledWith('Client review', today));
+  });
+
+  it('adds a holiday, reloads leave and says how many leaves got the day back', async () => {
+    vi.mocked(calendarService.addHoliday).mockResolvedValueOnce(3);
+    render(<ManagerApp user={user} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Calendar' }));
+    await screen.findByText('Company day');
+    const leaveLoads = vi.mocked(hrService.getLeaves).mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Add event or holiday' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Holiday' }));
+    expect(screen.getByText(/gets the day back in their balance/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Office day off' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add to calendar' }));
+    await waitFor(() => expect(calendarService.addHoliday).toHaveBeenCalledWith('Office day off', today));
+    expect(await screen.findByText(/3 leaves given back/)).toBeInTheDocument();
+    expect(vi.mocked(hrService.getLeaves).mock.calls.length).toBeGreaterThan(leaveLoads);
   });
 
   it('lists High priority first within a group and filters by Due today, High priority and Overdue', async () => {
