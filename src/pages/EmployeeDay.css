@@ -4,7 +4,7 @@
   --bg:#F4F6FA; --surface:#FFFFFF; --surface-2:#F7F9FC; --tint:#E8EFF8; --tint-2:#DCE6F3;
   --ink:#15213A; --navy:#1C2B4B; --steel:#2F5F92; --steel-2:#3A6EA5; --muted:#5A6578; --faint:#8793A6;
   --line:#E3E8EF; --line-2:#D5DDE8;
-  --ok:#186640; --ok-bg:#E6F3EC; --warn:#9A4A0C; --warn-bg:#FCEEDF; --bad:#A42A1F; --bad-bg:#FBEAE8; --info:#1F4E80; --info-bg:#E4ECF6;
+  --ok:#186640; --ok-bg:#E6F3EC; --warn:#9A4A0C; --warn-bg:#FCEEDF; --bad:#A42A1F; --bad-bg:#FBEAE8; --info:#1F4E80; --info-bg:#E4ECF6; --ann:#6B33A8; --ann-bg:#F3ECFB;
   --shadow:none;
   --sheet-shadow:0 -12px 40px -8px rgba(21,33,58,.25);
   box-sizing:border-box;
@@ -17,7 +17,7 @@
     --bg:#0F1726; --surface:#162136; --surface-2:#1A273E; --tint:#1B2C47; --tint-2:#233755;
     --ink:#E8EEF7; --navy:#DCE6F3; --steel:#8DB4E0; --steel-2:#A4C3E8; --muted:#A3AEC0; --faint:#7C889C;
     --line:#26344D; --line-2:#31415C;
-    --ok:#7FD1A4; --ok-bg:#16352A; --warn:#F2B27A; --warn-bg:#3A2716; --bad:#F29A90; --bad-bg:#3B1E1D; --info:#A9C6EA; --info-bg:#1E3050;
+    --ok:#7FD1A4; --ok-bg:#16352A; --warn:#F2B27A; --warn-bg:#3A2716; --bad:#F29A90; --bad-bg:#3B1E1D; --info:#A9C6EA; --info-bg:#1E3050; --ann:#C9A8F0; --ann-bg:#2A2040;
     --shadow:none;
     color-scheme:dark;
   }
@@ -26,7 +26,7 @@
   --bg:#0F1726; --surface:#162136; --surface-2:#1A273E; --tint:#1B2C47; --tint-2:#233755;
   --ink:#E8EEF7; --navy:#DCE6F3; --steel:#8DB4E0; --steel-2:#A4C3E8; --muted:#A3AEC0; --faint:#7C889C;
   --line:#26344D; --line-2:#31415C;
-  --ok:#7FD1A4; --ok-bg:#16352A; --warn:#F2B27A; --warn-bg:#3A2716; --bad:#F29A90; --bad-bg:#3B1E1D; --info:#A9C6EA; --info-bg:#1E3050;
+  --ok:#7FD1A4; --ok-bg:#16352A; --warn:#F2B27A; --warn-bg:#3A2716; --bad:#F29A90; --bad-bg:#3B1E1D; --info:#A9C6EA; --info-bg:#1E3050; --ann:#C9A8F0; --ann-bg:#2A2040;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -52,6 +52,12 @@ button{cursor:pointer}
 
 /* Hero */
 .hero{margin-top:14px}
+.ann{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.ann-i{display:flex;gap:12px;align-items:flex-start;background:var(--ann-bg);border:1px solid color-mix(in srgb,var(--ann) 30%,transparent);border-radius:14px;padding:12px 14px}
+.ann-i .mic{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--ann);color:var(--surface)}
+.ann-i .t{min-width:0;flex:1}
+.ann-i .t span{display:block;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ann)}
+.ann-i .t p{margin:3px 0 0;font-size:14.5px;line-height:1.45;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
 
 
 .hero h1{margin:0;font-size:22px;line-height:1.2;font-weight:700;letter-spacing:-.01em;color:var(--navy)}

@@ -1,7 +1,8 @@
 import { recurrenceLabel } from '../components/tasks/RecurrencePicker';
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Eye, Search, X } from 'lucide-react';
+import { Check, ChevronDown, Eye, Mic, Search, X } from 'lucide-react';
 import { hrService } from '../services/hrService';
+import { calendarService, CalendarEvent } from '../services/calendar.service';
 import { employeeService } from '../services/employeeService';
 import { assignedTaskService, AssignedTask, TaskStatus, priorityLabel, priorityOf, priorityRank } from '../services/assignedTask.service';
 import { useAssignedTasks } from '../hooks/useAssignedTasks';
@@ -46,6 +47,8 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
   const [workingDays, setWorkingDays] = useState<string[]>([]);
   const [holidays, setHolidays] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
+  // Manager announcements for today (set from the manager calendar, for today or a chosen date).
+  const [announcements, setAnnouncements] = useState<CalendarEvent[]>([]);
   // Half-day tasks turn overdue 4 h 30 min after Start; re-render every minute.
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []);
@@ -98,6 +101,9 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
         setAttendance(active || logs.filter(l => l.date === today).sort((a,b) => (b.checkIn || '').localeCompare(a.checkIn || ''))[0]);
         setWorkingDays((shift?.workingDays || config.workingDays || []).map(d => d.slice(0,3).toUpperCase()));
         setHolidays(hols.map(h => h.date)); setReady(true);
+        // Announcements are extra: if they fail to load, the rest of the day still shows.
+        const ann = await calendarService.announcementsOn(today).catch(() => null);
+        if (alive && ann) setAnnouncements(ann);
       } catch (e) { if (alive) setError(e instanceof Error ? e.message : 'Could not load your day. Please reload.'); }
     };
     void load();
@@ -187,6 +193,7 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
       <section className="hero" aria-labelledby="dayTitle"><h1 id="dayTitle">{date(today).toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' })}</h1>
         <div className="att"><div className="att-l"><span className={`dot${active ? '' : ' off'}`} /><div><b>{!ready ? 'Loading attendance…' : active ? 'Checked in' : attendance?.checkOut ? 'Checked out' : 'Not checked in'}</b><span>{punchTime ? `at ${punchTimeLabel(punchTime)}` : leaveToday ? 'On leave today · checking in gives the day back' : 'Start your day'}</span><button ref={apply} className="linkbtn al" onClick={showLeave} disabled={!ready || !canWrite}>Apply leave</button></div></div><button className={`btn att-btn ${active ? 'leave-btn' : 'in'}`} disabled={!ready || !canWrite} onClick={() => onNavigate(active ? 'attendance-finish' : 'attendance-quick-office')}>{active ? 'Check out' : 'Check in'}</button></div>
       </section>
+      {!!announcements.length && <section className="ann" aria-label="Announcements">{announcements.map(a => <div className="ann-i" key={a.id}><span className="mic"><Mic size={18} aria-hidden="true" /></span><div className="t"><span>Announcement</span><p>{a.title}</p></div></div>)}</section>}
       {error && <p className="err" role="alert">{error}</p>}
       <div className="tasks-h"><h2>My Tasks</h2><span>{tasks.filter(t => t.status !== 'END').length} open · {tasks.filter(doneToday).length} done today</span></div>
       <div className="search"><Search size={18} /><label htmlFor="task-query" className="vh">Search project or task</label><input id="task-query" type="search" placeholder="Search project or task" value={query} onChange={e => setQuery(e.target.value)} /></div>

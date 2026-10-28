@@ -60,6 +60,8 @@ const I = {
   plus: <Svg sw={2.6}><path d="M12 5v14M5 12h14" /></Svg>,
   moon: <Svg w={18}><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></Svg>,
   out: <Svg w={18}><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H4" /></Svg>,
+  mic: <Svg w={20} sw={2.2}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" /></Svg>,
+  micS: <Svg w={15} sw={2.4}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" /></Svg>,
 };
 const SIC: Record<TaskStatus, React.ReactNode> = {
   NOT_STARTED: <svg className="sic ns" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="1.8" /></svg>,
@@ -288,13 +290,15 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [personRows, setPersonRows] = useState<Attendance[]>([]);
   const [personLoading, setPersonLoading] = useState(false);
   const [sheetText, setSheetText] = useState('');
-  const [evK, setEvK] = useState<'ev' | 'hd'>('ev');
+  const [evK, setEvK] = useState<'ev' | 'hd' | 'an'>('ev');
   const [evTitle, setEvTitle] = useState('');
   const [evDate, setEvDate] = useState(() => ymd(new Date()));
   const [evBusy, setEvBusy] = useState(false);
   const swipe = useRef(new Map<string, { x0: number; y0: number; dx: number; on: boolean; dead: boolean; at: number }>());
   const openTask = (id: string) => { setSheetText(allTasks.find(t => t.id === id)?.description || ''); setSheet({ kind: 'task', id }); };
   const openEvent = () => { setEvK('ev'); setEvTitle(''); setEvDate(selDay); setSheet({ kind: 'event' }); };
+  // Announcements go out today or on a later day, never in the past.
+  const openAnnounce = () => { setEvK('an'); setEvTitle(''); setEvDate(selDay < T0 ? T0 : selDay); setSheet({ kind: 'event' }); };
   useEffect(() => {
     if (route !== 'attendance' || attView !== 'table') return;
     let alive = true;
@@ -847,27 +851,30 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   }
 
   function CalendarView() {
-    type Item = { k: 'hd' | 'ev' | 'lv'; t: string; sub: string; id?: string; removable?: boolean };
+    type Item = { k: 'hd' | 'an' | 'ev' | 'lv'; t: string; sub: string; id?: string; removable?: boolean };
     const itemsOn = (d: string): Item[] => {
       const out: Item[] = [];
       holidayOn(d).forEach(h => out.push({ k: 'hd', t: h.name, sub: 'Holiday', id: h.id, removable: !h.isGovernment }));
-      events.filter(e => e.event_date === d).forEach(e => out.push({ k: 'ev', t: e.title, sub: 'Event', id: e.id, removable: true }));
+      events.filter(e => e.event_date === d).forEach(e => out.push(e.kind === 'announcement'
+        ? { k: 'an', t: e.title, sub: `Announcement${e.created_by ? ` · ${empName(e.created_by) || 'Manager'}` : ''}`, id: e.id, removable: true }
+        : { k: 'ev', t: e.title, sub: 'Event', id: e.id, removable: true }));
       if (isWk(parse(d)) && !holidayOn(d).length) leaves.filter(l => l.status === 'APPROVED' && l.startDate <= d && l.endDate >= d)
         .forEach(l => out.push({ k: 'lv', t: l.employeeName, sub: `${typeName(l.type)} leave${l.startDate !== l.endDate ? ` · ${range(l.startDate, l.endDate)}` : ''}` }));
-      const o = { hd: 0, ev: 1, lv: 2 }; return out.sort((a, b) => o[a.k] - o[b.k]);
+      const o = { hd: 0, an: 1, ev: 2, lv: 3 }; return out.sort((a, b) => o[a.k] - o[b.k]);
     };
     const removeItem = async (x: Item, d: string) => {
       if (x.k === 'hd' && !window.confirm(`Remove the holiday “${x.t}” on ${dshort(d)}? Leave on that day will count it again.`)) return;
       try {
-        if (x.k === 'ev') { await calendarService.deleteEvent(x.id!); await loadCalendar(); say(`${x.t} removed`); return; }
+        if (x.k === 'ev' || x.k === 'an') { await calendarService.deleteEvent(x.id!); await loadCalendar(); say(`${x.t} removed`); return; }
         const changed = await calendarService.deleteHoliday(x.id!);
         await Promise.all([loadCalendar(), loadLeaves()]);
         say(`${x.t} removed${changed ? ` · ${plural(changed, 'leave')} updated` : ''}`);
       } catch (e) { fail(e); }
     };
     const agRow = (d: string) => (x: Item, i: number) => <div className="ag" key={`${x.k}-${x.id || x.t}-${i}`}>
-      <span className="bar2" style={{ background: x.k === 'lv' ? 'var(--steel)' : x.k === 'ev' ? 'var(--go)' : '#D07A1E' }} />
+      <span className="bar2" style={{ background: x.k === 'lv' ? 'var(--steel)' : x.k === 'ev' ? 'var(--go)' : x.k === 'an' ? 'var(--ann)' : '#D07A1E' }} />
       {x.k === 'lv' && <span className="av sm">{ini(x.t)}</span>}
+      {x.k === 'an' && <span className="ann-ic">{I.micS}</span>}
       <div className="t"><b>{x.t}</b><span>{x.sub}</span></div>
       {x.removable && <button className="btn ghost" style={{ color: 'var(--muted)', height: 36, padding: '0 10px' }} onClick={() => void removeItem(x, d)}>Remove</button>}
     </div>;
@@ -886,7 +893,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     return <>
       <div className="card">
         <div className="ch" style={{ padding: '10px 10px 0 16px' }}><h2>{MONL[calM]} {calY}</h2>
-          <div className="n"><button className="ibtn" aria-label="Add event or holiday" style={{ color: 'var(--steel)' }} onClick={openEvent}>{I.plus}</button>
+          <div className="n"><button className="ibtn" aria-label="Make an announcement" title="Announcement" style={{ color: 'var(--ann)' }} onClick={openAnnounce}>{I.mic}</button>
+            <button className="ibtn" aria-label="Add event or holiday" style={{ color: 'var(--steel)' }} onClick={openEvent}>{I.plus}</button>
             <button className="ibtn" aria-label="Previous month" onClick={() => move(-1)}>{I.l}</button>
             <button className="btn ghost" style={{ height: 36, padding: '0 10px' }} onClick={() => move(0)}>Today</button>
             <button className="ibtn" aria-label="Next month" onClick={() => move(1)}>{I.r}</button></div></div>
@@ -897,11 +905,11 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
             const cls = `day${d.getMonth() !== calM ? ' out' : ''}${!isWk(d) ? ' we' : ''}${kinds.has('hd') ? ' hol' : ''}${s === T0 ? ' today' : ''}${s === selDay ? ' sel' : ''}`;
             return <button key={s} className={cls} aria-pressed={s === selDay} aria-label={`${DAYL[d.getDay()]} ${d.getDate()} ${MONL[d.getMonth()]}${it.length ? `, ${plural(it.length, 'item')}` : ''}`}
               onClick={() => { setSelDay(s); if (d.getMonth() !== calM) { setCalM(d.getMonth()); setCalY(d.getFullYear()); } }}>
-              <span className="dn">{d.getDate()}</span><span className="dots">{(['hd', 'ev', 'lv'] as const).filter(k => kinds.has(k)).map(k => <i key={k} className={`k-${k}`} />)}</span>
+              <span className="dn">{d.getDate()}</span><span className="dots">{(['hd', 'an', 'ev', 'lv'] as const).filter(k => kinds.has(k)).map(k => <i key={k} className={`k-${k}`} />)}</span>
             </button>;
           })}
         </div>
-        <div className="legend"><span><i className="k-lv" />Leave</span><span><i className="k-ev" />Event</span><span><i className="k-hd" />Holiday</span></div>
+        <div className="legend"><span><i className="k-lv" />Leave</span><span><i className="k-ev" />Event</span><span><i className="k-hd" />Holiday</span><span><i className="k-an" />Announcement</span></div>
       </div>
       <div className="sec"><h2>{selDay === T0 ? 'Today · ' : ''}{dshort(selDay)}</h2><span>{sel.length || ''}</span></div>
       <div className="list">{sel.length ? sel.map(agRow(selDay)) :<div className="empty">Nothing on this day</div>}</div>
@@ -916,23 +924,28 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       setBusy(true);
       try {
         if (k === 'ev') { await calendarService.addEvent(title, date); await loadCalendar(); setSheet(null); say(`${title.trim()} added · ${dshort(date)}`); return; }
+        if (k === 'an') { await calendarService.addAnnouncement(title, date); await loadCalendar(); setSheet(null); say(date === T0 ? 'Announced to everyone today' : `Announcement set for ${dshort(date)}`); return; }
         const changed = await calendarService.addHoliday(title, date);
         await Promise.all([loadCalendar(), loadLeaves()]); setSheet(null);
         say(`${title.trim()} added · ${dshort(date)}${changed ? ` · ${plural(changed, 'leave')} given back` : ''}`);
       } catch (e) { fail(e); } finally { setBusy(false); }
     };
     return <>
-      <div className="grab" /><div className="sh"><h2 id="sheetT">Add to calendar</h2><button className="ibtn" aria-label="Close" onClick={() => setSheet(null)}>{I.x}</button></div>
+      <div className="grab" /><div className="sh"><h2 id="sheetT">{k === 'an' ? 'Announcement' : 'Add to calendar'}</h2><button className="ibtn" aria-label="Close" onClick={() => setSheet(null)}>{I.x}</button></div>
       <div className="seg" role="tablist" style={{ marginTop: 6 }}>
         <button role="tab" aria-selected={k === 'ev'} style={{ flex: 1 }} onClick={() => setK('ev')}>Event</button>
         <button role="tab" aria-selected={k === 'hd'} style={{ flex: 1 }} onClick={() => setK('hd')}>Holiday</button>
+        <button role="tab" aria-selected={k === 'an'} style={{ flex: 1 }} onClick={() => { setK('an'); if (date < T0) setDate(T0); }}><span className="ann-tab">{I.micS}Announce</span></button>
       </div>
-      <label className="lab" htmlFor="evT" style={{ marginTop: 16 }}>Title</label>
-      <input className="inp" id="evT" placeholder={k === 'ev' ? 'e.g. Client review' : 'e.g. Company day off'} autoComplete="off" maxLength={200} value={title} onChange={e => setTitle(e.target.value)} />
+      <label className="lab" htmlFor="evT" style={{ marginTop: 16 }}>{k === 'an' ? 'Message' : 'Title'}</label>
+      {k === 'an'
+        ? <textarea className="inp ann-msg" id="evT" rows={3} placeholder="e.g. Team meeting at 11 am in the Madhapur office" maxLength={500} value={title} onChange={e => setTitle(e.target.value)} />
+        : <input className="inp" id="evT" placeholder={k === 'ev' ? 'e.g. Client review' : 'e.g. Company day off'} autoComplete="off" maxLength={200} value={title} onChange={e => setTitle(e.target.value)} />}
       <label className="lab" htmlFor="evD" style={{ marginTop: 14 }}>Date</label>
-      <input className="inp" type="date" id="evD" value={date} onChange={e => setDate(e.target.value)} />
+      <input className="inp" type="date" id="evD" min={k === 'an' ? T0 : undefined} value={date} onChange={e => setDate(e.target.value)} />
       {k === 'hd' && <p className="small">Holidays are shared with the whole company and never count as leave. Anyone already on leave that day, approved or waiting, gets the day back in their balance, even for a past date.</p>}
-      <button className="btn pri lg wide" style={{ marginTop: 18 }} disabled={!title.trim() || !date || busy} onClick={() => void go()}>{busy ? 'Adding…' : 'Add to calendar'}</button>
+      {k === 'an' && <p className="small">Every employee sees this on their home screen {date === T0 ? 'today' : date ? `on ${dshort(date)}` : 'on that day'}.</p>}
+      <button className="btn pri lg wide" style={{ marginTop: 18 }} disabled={!title.trim() || !date || busy || (k === 'an' && date < T0)} onClick={() => void go()}>{busy ? (k === 'an' ? 'Announcing…' : 'Adding…') : k === 'an' ? 'Announce' : 'Add to calendar'}</button>
     </>;
   }
 

@@ -15,6 +15,13 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-10-28',
+    title: 'Manager announcements on the calendar',
+    entries: [
+      { type: 'feature', description: 'Manager calendar: a mic button makes an announcement for today or any later date. Every employee sees it on their home screen on that day, with a mic icon; on the calendar it shows as a purple dot and can be removed like an event. Migration 0099.' },
+    ],
+  },
+  {
     date: '2026-10-27',
     title: 'Holidays and check-ins give leave days back',
     entries: [
