@@ -49,6 +49,16 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
   const [open, setOpen] = useState(false);
   // Manager announcements for today (set from the manager calendar, for today or a chosen date).
   const [announcements, setAnnouncements] = useState<CalendarEvent[]>([]);
+  // Announcements this employee closed with X; kept on this phone so they stay closed after a reload.
+  const hiddenKey = `voxel1.hiddenAnnouncements.${user.id}`;
+  const [hiddenAnn, setHiddenAnn] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(hiddenKey) || '[]'); } catch { return []; } });
+  const hideAnnouncement = (id: string) => {
+    // Only today's ids are worth keeping; older announcements never show again.
+    const next = [...hiddenAnn.filter(h => announcements.some(a => a.id === h)), id];
+    setHiddenAnn(next);
+    try { localStorage.setItem(hiddenKey, JSON.stringify(next)); } catch { /* private mode: closed until reload */ }
+  };
+  const shownAnn = announcements.filter(a => !hiddenAnn.includes(a.id));
   // Half-day tasks turn overdue 4 h 30 min after Start; re-render every minute.
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []);
@@ -193,7 +203,7 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
       <section className="hero" aria-labelledby="dayTitle"><h1 id="dayTitle">{date(today).toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' })}</h1>
         <div className="att"><div className="att-l"><span className={`dot${active ? '' : ' off'}`} /><div><b>{!ready ? 'Loading attendance…' : active ? 'Checked in' : attendance?.checkOut ? 'Checked out' : 'Not checked in'}</b><span>{punchTime ? `at ${punchTimeLabel(punchTime)}` : leaveToday ? 'On leave today · checking in gives the day back' : 'Start your day'}</span><button ref={apply} className="linkbtn al" onClick={showLeave} disabled={!ready || !canWrite}>Apply leave</button></div></div><button className={`btn att-btn ${active ? 'leave-btn' : 'in'}`} disabled={!ready || !canWrite} onClick={() => onNavigate(active ? 'attendance-finish' : 'attendance-quick-office')}>{active ? 'Check out' : 'Check in'}</button></div>
       </section>
-      {!!announcements.length && <section className="ann" aria-label="Announcements">{announcements.map(a => <div className="ann-i" key={a.id}><span className="mic"><Mic size={18} aria-hidden="true" /></span><div className="t"><span>Announcement</span><p>{a.title}</p></div></div>)}</section>}
+      {!!shownAnn.length && <section className="ann" aria-label="Announcements">{shownAnn.map(a => <div className="ann-i" key={a.id}><span className="mic"><Mic size={18} aria-hidden="true" /></span><div className="t"><span>Announcement</span><p>{a.title}</p></div><button type="button" className="ann-x" aria-label="Close announcement" onClick={() => hideAnnouncement(a.id)}><X size={18} aria-hidden="true" /></button></div>)}</section>}
       {error && <p className="err" role="alert">{error}</p>}
       <div className="tasks-h"><h2>My Tasks</h2><span>{tasks.filter(t => t.status !== 'END').length} open · {tasks.filter(doneToday).length} done today</span></div>
       <div className="search"><Search size={18} /><label htmlFor="task-query" className="vh">Search project or task</label><input id="task-query" type="search" placeholder="Search project or task" value={query} onChange={e => setQuery(e.target.value)} /></div>

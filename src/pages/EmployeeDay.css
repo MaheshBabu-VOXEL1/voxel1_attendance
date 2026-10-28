@@ -58,6 +58,9 @@ button{cursor:pointer}
 .ann-i .t{min-width:0;flex:1}
 .ann-i .t span{display:block;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ann)}
 .ann-i .t p{margin:3px 0 0;font-size:14.5px;line-height:1.45;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+.ann-i .ann-x{flex:none;width:36px;height:36px;margin:-6px -8px -6px 0;border:0;border-radius:50%;background:transparent;color:var(--ann);display:grid;place-items:center;cursor:pointer}
+.ann-i .ann-x:hover{background:color-mix(in srgb,var(--ann) 14%,transparent)}
+.ann-i .ann-x:focus-visible{outline:2px solid var(--ann);outline-offset:1px}
 
 
 .hero h1{margin:0;font-size:22px;line-height:1.2;font-weight:700;letter-spacing:-.01em;color:var(--navy)}

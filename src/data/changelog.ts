@@ -19,6 +19,7 @@ export const changelog: ChangelogRelease[] = [
     title: 'Manager announcements on the calendar',
     entries: [
       { type: 'feature', description: 'Manager calendar: a mic button makes an announcement for today or any later date. Every employee sees it on their home screen on that day, with a mic icon; on the calendar it shows as a purple dot and can be removed like an event. Migration 0099.' },
+      { type: 'feature', description: 'Employee home screen: an X on each announcement closes it once read; it stays closed on that phone after a reload.' },
     ],
   },
   {
