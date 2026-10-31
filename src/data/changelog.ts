@@ -15,6 +15,13 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-10-31',
+    title: 'Privacy policy page for the Android app',
+    entries: [
+      { type: 'feature', description: 'New public privacy policy for the Voxel1_Daily Android app at /privacy-policy (also reached from /privacy), for the Play Store listing. Covers employee details, attendance, check-in location, leave and tasks, service providers, retention and deletion requests to kesari.payneni@voxel1.com.' },
+    ],
+  },
+  {
     date: '2026-10-28',
     title: 'Manager announcements on the calendar',
     entries: [

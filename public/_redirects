@@ -4,8 +4,9 @@
 /blog/*       /  301
 /how-to-use   /  301
 /how-to-use/* /  301
-/privacy      /  301
-/privacy/     /  301
+/privacy      /privacy-policy  301
+/privacy/     /privacy-policy  301
+/privacy-policy  /privacy-policy.html  200
 /terms        /  301
 /terms/       /  301
 /about        /  301

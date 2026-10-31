@@ -19,8 +19,8 @@
     { "source": "/blog/:path*", "destination": "/", "permanent": true },
     { "source": "/how-to-use", "destination": "/", "permanent": true },
     { "source": "/how-to-use/:path*", "destination": "/", "permanent": true },
-    { "source": "/privacy", "destination": "/", "permanent": true },
-    { "source": "/privacy/", "destination": "/", "permanent": true },
+    { "source": "/privacy", "destination": "/privacy-policy", "permanent": true },
+    { "source": "/privacy/", "destination": "/privacy-policy", "permanent": true },
     { "source": "/terms", "destination": "/", "permanent": true },
     { "source": "/terms/", "destination": "/", "permanent": true },
     { "source": "/about", "destination": "/", "permanent": true },
@@ -31,6 +31,7 @@
     { "source": "/changelog/", "destination": "/", "permanent": true }
   ],
   "rewrites": [
+    { "source": "/privacy-policy", "destination": "/privacy-policy.html" },
     { "source": "/((?!assets/|sitemap\\.xml|robots\\.txt|manifest\\.json|feed\\.xml|sw\\.js|registerSW\\.js|workbox-.*\\.js).*)", "destination": "/index.html" }
   ]
 }
