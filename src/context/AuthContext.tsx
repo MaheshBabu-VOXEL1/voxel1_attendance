@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from '../services/supabase';
 import { sessionManager } from '../services/session/sessionManager';
 import { isOfflineMode, offlineAuth } from '../services/offlineMode';
 import { RefreshStatus } from '../services/session/sessionManager.types';
+import { startNativePush, unregisterNativePush } from '../services/nativePush.service';
 
 interface AuthContextType {
   user: User | null;
@@ -96,7 +97,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     hrService.prefetchMetadata();
   };
 
+  useEffect(() => {
+    if (!user || !isConfigured || isOfflineMode) return;
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    void startNativePush(user.id).then(cleanup => {
+      if (disposed) cleanup(); else stop = cleanup;
+    });
+    return () => { disposed = true; stop?.(); };
+  }, [user?.id, isConfigured]);
+
   const logout = async () => {
+    await unregisterNativePush();
     await hrService.logout();
     // hrService.logout → auth.service.logout → sessionManager.forceLogout
   };
