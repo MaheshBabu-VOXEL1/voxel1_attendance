@@ -365,3 +365,23 @@ table.att{width:100%;border-collapse:collapse;font-size:13.5px}
 }
 }
 @keyframes mgr-popin{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+/* Daily work uses the manager shell tokens, including dark mode. */
+.mgr .today-tools{flex-wrap:wrap}
+.mgr .today-toggle{height:36px;padding:0 11px;border-color:var(--steel);color:var(--steel)}
+.mgr .today-toggle[aria-pressed=true]{background:var(--steel);color:var(--on)}
+.mgr .today-person{margin-top:12px;padding:14px}
+.mgr .today-person-head{display:flex;align-items:center;gap:10px}
+.mgr .today-person h3{margin:0;font-size:15px;font-weight:700}
+.mgr .today-work{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.mgr .today-task-head{display:flex;align-items:flex-start;gap:10px}
+.mgr .today-task-head .tt{flex:1;min-width:0;overflow-wrap:anywhere}
+.mgr .today-status{flex:none;font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.mgr .today-status.start,.mgr .today-status.progress{background:var(--info-bg);color:var(--info)}
+.mgr .today-status.stuck{background:var(--bad-bg);color:var(--bad)}
+.mgr .today-status.end{background:var(--ok-bg);color:var(--ok)}
+.mgr .today-comment{margin-top:8px;background:var(--surface-2);padding:10px 12px;border-radius:10px;overflow-wrap:anywhere;white-space:pre-wrap}
+.mgr .today-comment small{color:var(--muted);font-size:11.5px}
+.mgr .today-comment p{margin:4px 0 0;font-size:13px}
+.mgr .today-no-update{color:var(--warn);margin:10px 0 0;font-size:13px}
+@media(max-width:480px){.mgr .today-tools .pf{flex:1;max-width:none}.mgr .today-tools .seg{flex:1 0 100%}.mgr .today-tools .seg button{flex:1}}

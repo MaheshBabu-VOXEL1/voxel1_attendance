@@ -62,6 +62,18 @@ describe('manager app', () => {
     HTMLDialogElement.prototype.showModal = function() { this.setAttribute('open', ''); };
   });
 
+  it('opens daily updates from Today and returns to the normal Date view', async () => {
+    render(<ManagerApp user={user} />);
+    const todayButton = screen.getByRole('button', { name: "Show today's team updates" });
+    fireEvent.click(todayButton);
+    expect(todayButton).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('textbox', { name: 'New task' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: "Today's team updates" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Date' }));
+    expect(todayButton).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('textbox', { name: 'New task' })).toBeInTheDocument();
+  });
+
   it('shows the actual assigner and recipient across the shared manager board', async () => {
     render(<ManagerApp user={user} />);
     expect(screen.getByText('Assigned by Maruthi → Divya Kallepalli')).toBeInTheDocument();

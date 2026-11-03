@@ -15,6 +15,7 @@ import { punchTimeLabel } from '../utils/attendanceUtils';
 import './ManagerApp.css';
 import AccountModeSwitch from '../components/AccountModeSwitch';
 import StuckNoteDialog from '../components/tasks/StuckNoteDialog';
+import TodayTeamTasks from '../components/tasks/TodayTeamTasks';
 import { RecurrencePicker, recurrenceLabel } from '../components/tasks/RecurrencePicker';
 
 /* Manager app: Tasks / Leaves / Calendar, built from the voxel1-manager.html design on live data. */
@@ -261,6 +262,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [text, setText] = useState('');
   const [adding, setAdding] = useState(false);
   const [groupBy, setGroupBy] = useState<Group>('date');
+  const [todayView, setTodayView] = useState(false);
   // Marking a task Stuck asks how much is done and why.
   const [stuckFor, setStuckFor] = useState<AssignedTask | null>(null);
   const [stuckErr, setStuckErr] = useState('');
@@ -591,7 +593,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         {over > 0 && <> · <span style={{ color: 'var(--warn)', fontWeight: 600 }}>{over} overdue</span></>}
         {stuck > 0 && <> · <span style={{ color: 'var(--bad)', fontWeight: 600 }}>{stuck} stuck</span></>}</p></div></div>
       {tasksError && <p className="alert" role="alert">{tasksError}</p>}
-      <div className="card comp">
+      {!todayView && <div className="card comp">
         <div className="c1">
           <button type="button" className="pj" aria-haspopup="listbox" aria-label={`Project: ${cpP || 'choose'}`}
             onClick={e => { const a = e.currentTarget; menuProject(a, cpP, v => { if (v === '__new__') newProjectBox(a, n => setCpP(n)); else setCpP(v); }); }}>
@@ -611,26 +613,27 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
             <button key={k} type="button" role="radio" aria-checked={cpPri === k} className={k.toLowerCase()} onClick={() => setCpPri(k)}>{priorityLabel[k]}</button>)}</div>
         </div>
         <RecurrencePicker days={cpDays} onChange={setCpDays} disabled={adding} />
-      </div>
-      <div className="tools">
+      </div>}
+      <div className="tools today-tools">
         <button type="button" className="pf" aria-haspopup="listbox" onClick={e => menuProject(e.currentTarget, pfilter, v => setPfilter(v), true)}>
           <span>{pfilter === 'all' ? 'All projects' : pfilter}</span>{I.down}</button>
         <button type="button" className="ibtn" aria-label="Search tasks" aria-pressed={searchOn} style={searchOn ? { color: 'var(--steel)', background: 'var(--tint)' } : undefined}
           onClick={() => { setSearchOn(!searchOn); if (searchOn) setQ(''); }}>{I.search}</button>
+        <button type="button" className="btn today-toggle" aria-label="Show today's team updates" aria-pressed={todayView} onClick={() => setTodayView(v => !v)}>Today</button>
         <div className="seg" role="tablist" aria-label="Group by">
           {([['date', 'Date'], ['person', 'Person'], ['project', 'Project']] as [Group, string][]).map(([v, l]) =>
-            <button key={v} role="tab" aria-selected={groupBy === v} onClick={() => setGroupBy(v)}>{l}</button>)}
+            <button key={v} role="tab" aria-selected={!todayView && groupBy === v} onClick={() => { setTodayView(false); setGroupBy(v); }}>{l}</button>)}
         </div>
       </div>
-      <div className="fbar" role="group" aria-label="Filter tasks">{FILTERS.map(([v, l, f]) => {
+      {!todayView && <div className="fbar" role="group" aria-label="Filter tasks">{FILTERS.map(([v, l, f]) => {
         const n = v === 'all' ? 0 : fcount(f);
         return <button key={v} type="button" className={`fchip${v === 'overdue' && n ? ' warn' : ''}`} aria-pressed={tfilter === v} onClick={() => setTfilter(tfilter === v && v !== 'all' ? 'all' : v)}>
           {l}{v !== 'all' && <b>{n}</b>}</button>;
-      })}</div>
+      })}</div>}
       {searchOn && <div className="srch">{I.search}<label className="vh" htmlFor="q">Search tasks</label>
         <input id="q" type="search" placeholder="Search task, project or person" value={q} autoFocus autoComplete="off" onChange={e => setQ(e.target.value)} />
         <button className="ibtn" aria-label="Close search" style={{ width: 36, height: 36 }} onClick={() => { setSearchOn(false); setQ(''); }}>{I.cross}</button></div>}
-      {tasksLoading ? <p className="loading" role="status">Loading tasks…</p> : <>
+      {todayView ? <TodayTeamTasks tasks={tasks} employees={employees} project={pfilter} query={q} loading={tasksLoading} onOpen={openTask} /> : tasksLoading ? <p className="loading" role="status">Loading tasks…</p> : <>
         {shown.map(g => <React.Fragment key={g.t}>
           <div className={`sec${g.cls ? ` ${g.cls}` : ''}`}><h2>{g.who && dot(g.who)}{g.t}</h2>{g.who ? (() => { const d = doneTodayBy(g.who), n = d + g.l.length;
             return !n ? <span>{g.note || 0}</span> : <span className="prog" title={`${d} of ${n} done today`} aria-label={`${d} of ${n} done today`}>{g.note ? `${g.note} · ` : ''}<b>{d}</b>/{n}</span>; })()

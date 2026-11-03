@@ -172,6 +172,18 @@ export const assignedTaskService = {
     if (error) throw new Error(error.message);
     return data || [];
   },
+  /** Read today's notes in pages; row-level security keeps this within the visible task board. */
+  async listDailyComments(since: string, until: string): Promise<TaskComment[]> {
+    const rows: TaskComment[] = [];
+    for (let offset = 0; ; offset += 500) {
+      const { data, error } = await supabase.from('task_comments').select('*')
+        .gte('created_at', since).lt('created_at', until)
+        .order('created_at', { ascending: false }).order('id', { ascending: false }).range(offset, offset + 499);
+      if (error) throw new Error(error.message);
+      rows.push(...(data || []));
+      if (!data || data.length < 500) return rows;
+    }
+  },
   async completeWithNote(taskId: string, note: string): Promise<AssignedTask> {
     const { data, error } = await supabase.rpc('complete_assigned_task', { p_task_id: taskId, p_note: note.trim() });
     if (error) throw new Error(error.message);
