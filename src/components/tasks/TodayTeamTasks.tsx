@@ -46,9 +46,8 @@ export default function TodayTeamTasks({ tasks, employees, project, query, loadi
     return () => { alive = false; clearInterval(timer); window.removeEventListener('focus', tick); document.removeEventListener('visibilitychange', tick); };
   }, [day, retry]);
   const daily = tasks.filter(t => t.employee_id && isTodayTask(t, day, notes) && (project === 'all' || t.project_name === project));
-  // Keep people visible even when they have no daily update. Include visible assignees missing from the roster.
+  // Keep people visible even when they have no daily update. Only the active roster is shown, so people who left drop off.
   const roster = new Map(employees.map(e => [e.id, { id: e.id, name: e.name }]));
-  daily.forEach(t => { if (!roster.has(t.employee_id!)) roster.set(t.employee_id!, { id: t.employee_id!, name: t.employee_name || 'Team member' }); });
   const rows = [...roster.values()].sort((a, b) => a.name.localeCompare(b.name)).map(person => ({
     person, work: daily.filter(t => t.employee_id === person.id),
   })).filter(({ person, work }) => {

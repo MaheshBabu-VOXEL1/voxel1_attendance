@@ -25,4 +25,11 @@ describe('daily team updates', () => {
     expect(screen.getByText('Employee Two')).toBeInTheDocument();
     expect(screen.queryByText('Earlier task')).not.toBeInTheDocument();
   });
+  it('hides open tasks of people no longer on the active roster', async () => {
+    render(<TodayTeamTasks tasks={[task({ id: 'gone', employee_id: 'x9', employee_name: 'Former Member', description: 'Left behind', status: 'START' })]}
+      employees={[{ id: 'e1', name: 'Employee One' }] as any} project="all" query="" loading={false} onOpen={vi.fn()} />);
+    expect(await screen.findByText('Employee One')).toBeInTheDocument();
+    expect(screen.queryByText('Former Member')).not.toBeInTheDocument();
+    expect(screen.queryByText('Left behind')).not.toBeInTheDocument();
+  });
 });

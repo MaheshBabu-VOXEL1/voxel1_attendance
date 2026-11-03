@@ -15,6 +15,13 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-11-03',
+    title: 'Today view shows only current staff',
+    entries: [
+      { type: 'fix', description: 'Today’s team tasks on the Manager board no longer lists people who have left (inactive accounts), even if they still have an unfinished task.' },
+    ],
+  },
+  {
     date: '2026-10-31',
     title: 'Privacy policy page for the Android app',
     entries: [
