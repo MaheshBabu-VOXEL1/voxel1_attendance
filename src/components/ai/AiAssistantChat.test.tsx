@@ -33,7 +33,7 @@ describe('AI assistant chat', () => {
     render(<Host />);
     fireEvent.click(screen.getByRole('button', { name: 'Which tasks are stuck, and why?' }));
     await screen.findByText('Two tasks are stuck.');
-    fireEvent.change(screen.getByLabelText('Ask the AI assistant'), { target: { value: 'Why is Ravi stuck?' } });
+    fireEvent.change(screen.getByLabelText('Ask the Voxel_Daily assistant'), { target: { value: 'Why is Ravi stuck?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));
     await screen.findByText('Ravi: waiting for drawings.');
     expect(mocks.ask).toHaveBeenLastCalledWith([

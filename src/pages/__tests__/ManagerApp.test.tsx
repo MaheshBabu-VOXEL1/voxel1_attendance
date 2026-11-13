@@ -612,13 +612,13 @@ describe('AI assistant access', () => {
   it('shows the AI button only to allowed people and opens the chat', async () => {
     ai.canUse.mockResolvedValueOnce(true);
     render(<ManagerApp user={user} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'AI assistant' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Voxel_Daily assistant' }));
     expect(screen.getByRole('button', { name: 'Who has no task today?' })).toBeInTheDocument();
   });
   it('hides the AI button from everyone else', async () => {
     ai.canUse.mockResolvedValueOnce(false);
     render(<ManagerApp user={user} />);
     await waitFor(() => expect(ai.canUse).toHaveBeenCalled());
-    expect(screen.queryByRole('button', { name: 'AI assistant' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Voxel_Daily assistant' })).toBeNull();
   });
 });
