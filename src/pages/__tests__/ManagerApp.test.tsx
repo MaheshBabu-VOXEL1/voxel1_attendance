@@ -455,10 +455,9 @@ describe('manager app', () => {
     } finally { vi.mocked(hrService.isLeaveApprover).mockResolvedValue(true); }
   });
 
-  it('shows the calendar inside Attendance and adds an event from the month header', async () => {
+  it('has Calendar as its own tab (not inside Attendance) and adds an event from the month header', async () => {
     render(<ManagerApp user={user} />);
-    fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));
-    fireEvent.click(screen.getByRole('tab', { name: 'Calendar' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Calendar/ }));
     expect(await screen.findByText('Company day')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Add event or holiday' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Client review' } });
@@ -466,12 +465,21 @@ describe('manager app', () => {
     await waitFor(() => expect(calendarService.addEvent).toHaveBeenCalledWith('Client review', today));
   });
 
+  it('shows four bottom tabs and keeps Attendance free of the calendar switch', async () => {
+    render(<ManagerApp user={user} />);
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    expect(Array.from(nav.querySelectorAll('button')).map(b => b.textContent?.replace(/\d+$/, ''))).toEqual(['Tasks', 'Leaves', 'Attendance', 'Calendar']);
+    fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));
+    expect(screen.getByRole('heading', { name: 'Attendance' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Calendar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Make an announcement' })).toBeNull();
+  });
+
   it('makes an announcement with a megaphone button, an optional time, and shows the time on the calendar', async () => {
     vi.mocked(calendarService.listEvents).mockResolvedValue([{ id: 'a1', title: 'Team meeting', event_date: today, event_time: '11:00:00', created_by: null, kind: 'announcement' }] as any);
     try {
       render(<ManagerApp user={user} />);
-      fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));
-      fireEvent.click(screen.getByRole('tab', { name: 'Calendar' }));
+      fireEvent.click(screen.getByRole('button', { name: /^Calendar/ }));
       expect(await screen.findByText('Announcement · 11:00 am')).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: 'Make an announcement' }));
       fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Review at 4' } });
@@ -485,8 +493,7 @@ describe('manager app', () => {
   it('adds a holiday, reloads leave and says how many leaves got the day back', async () => {
     vi.mocked(calendarService.addHoliday).mockResolvedValueOnce(3);
     render(<ManagerApp user={user} />);
-    fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));
-    fireEvent.click(screen.getByRole('tab', { name: 'Calendar' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Calendar/ }));
     await screen.findByText('Company day');
     const leaveLoads = vi.mocked(hrService.getLeaves).mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: 'Add event or holiday' }));

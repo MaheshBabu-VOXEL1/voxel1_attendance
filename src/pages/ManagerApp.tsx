@@ -22,9 +22,9 @@ import StuckNoteDialog from '../components/tasks/StuckNoteDialog';
 import TodayTeamTasks from '../components/tasks/TodayTeamTasks';
 import { RecurrencePicker, RecurrenceDays, RepeatButton, recurrenceLabel } from '../components/tasks/RecurrencePicker';
 
-/* Manager app: Tasks / Leaves / Calendar, built from the voxel1-manager.html design on live data. */
+/* Manager app: Tasks / Leaves / Attendance / Calendar, built from the voxel1-manager.html design on live data. */
 
-type Route = 'tasks' | 'leaves' | 'attendance';
+type Route = 'tasks' | 'leaves' | 'attendance' | 'calendar';
 type Group = 'date' | 'person' | 'project';
 type TFilter = 'all' | 'progress' | 'today' | 'overdue' | 'high' | 'stuck' | 'mine' | 'byme';
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
@@ -80,6 +80,7 @@ const NAV: [Route, string, React.ReactNode][] = [
   ['tasks', 'Tasks', <Svg w={22} sw={1.9}><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3" /></Svg>],
   ['leaves', 'Leaves', <Svg w={22} sw={1.9}><path d="M8 7V3M16 7V3" /><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8.5 14.5l2.3 2.3 4.7-4.8" /></Svg>],
   ['attendance', 'Attendance', <Svg w={22} sw={1.9}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Svg>],
+  ['calendar', 'Calendar', <Svg w={22} sw={1.9}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 10h18" /></Svg>],
 ];
 
 interface MenuItem { v: string; label: string; sub?: string; lead?: React.ReactNode; on?: boolean; muted?: boolean; sep?: boolean }
@@ -297,7 +298,6 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [calM, setCalM] = useState(() => new Date().getMonth());
   const [selDay, setSelDay] = useState(() => ymd(new Date()));
   const [attDate, setAttDate] = useState(() => ymd(new Date()));
-  const [attView, setAttView] = useState<'table' | 'calendar'>('table');
   const [personRows, setPersonRows] = useState<Attendance[]>([]);
   const [personLoading, setPersonLoading] = useState(false);
   const [sheetText, setSheetText] = useState('');
@@ -312,14 +312,14 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   // Announcements go out today or on a later day, never in the past.
   const openAnnounce = () => { setEvK('an'); setEvTitle(''); setEvTime(''); setEvDate(selDay < T0 ? T0 : selDay); setSheet({ kind: 'event' }); };
   useEffect(() => {
-    if (route !== 'attendance' || attView !== 'table') return;
+    if (route !== 'attendance') return;
     let alive = true;
     const load = () => { setDayLoading(true); hrService.getAttendance({ since: attDate, until: attDate })
       .then(rows => { if (alive) setDayRows(rows); }).catch(() => {}).finally(() => alive && setDayLoading(false)); };
     load();
     const timer = window.setInterval(() => { if (!document.hidden) load(); }, 60000);
     return () => { alive = false; clearInterval(timer); };
-  }, [route, attDate, attView]);
+  }, [route, attDate]);
   // A person's last two weeks (sheet opened from the attendance table).
   const personId = sheet?.kind === 'person' ? sheet.id : '';
   useEffect(() => {
@@ -465,6 +465,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       {route === 'tasks' && TasksView()}
       {route === 'leaves' && LeavesView()}
       {route === 'attendance' && AttendanceView()}
+      {route === 'calendar' && <><div className="ph"><div><h1>Calendar</h1><p>Meetings, leave, events and holidays</p></div></div>{CalendarView()}</>}
     </main>
     <nav className="nav" aria-label="Main"><div className="nav-in">
       {NAV.map(([id, label, icon]) => <button key={id} aria-current={route === id ? 'page' : undefined} onClick={() => { setRoute(id); setPop(null); window.scrollTo(0, 0); }}>
@@ -908,8 +909,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     }
     return <>
       <div className="card">
-        <div className="ch" style={{ padding: '10px 10px 0 16px' }}><h2>{MONL[calM]} {calY}</h2>
-          <div className="n"><button className="ibtn" aria-label="Make an announcement" title="Announcement" onClick={openAnnounce}>{I.mic}</button>
+        <div className="ch" style={{ padding: '10px 10px 0 16px', flexWrap: 'wrap' }}><h2 style={{ whiteSpace: 'nowrap' }}>{MONL[calM]} {calY}</h2>
+          <div className="n" style={{ marginLeft: 'auto' }}><button className="ibtn" aria-label="Make an announcement" title="Announcement" onClick={openAnnounce}>{I.mic}</button>
             <button className="ibtn" aria-label="Add event or holiday" style={{ color: 'var(--steel)' }} onClick={openEvent}>{I.plus}</button>
             <button className="ibtn" aria-label="Previous month" onClick={() => move(-1)}>{I.l}</button>
             <button className="btn ghost" style={{ height: 36, padding: '0 10px' }} onClick={() => move(0)}>Today</button>
@@ -967,7 +968,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     </>;
   }
 
-  // ---------- attendance: Table / Calendar ----------
+  // ---------- attendance ----------
   function toMin(t?: string) { if (!t) return null; const [h, m] = t.split(':').map(Number); return h * 60 + m; }
   function hm(m: number, ampm = false) { const h = Math.floor(m / 60), mm = m % 60; return `${(h % 12) || 12}:${String(mm).padStart(2, '0')}${ampm ? (h < 12 ? ' am' : ' pm') : ''}`; }
   function dur(m: number) { return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; }
@@ -1008,12 +1009,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   function openPerson(id: string) { setSheet({ kind: 'person', id }); }
 
   function AttendanceView() {
-    const head = <div className="ph"><div><h1>Attendance</h1><p>{attView === 'table' ? 'Daily check-in and check-out' : 'Leave, events and holidays'}</p></div>
-      <div className="seg" role="tablist" aria-label="View">
-        <button role="tab" aria-selected={attView === 'table'} onClick={() => setAttView('table')}>Table</button>
-        <button role="tab" aria-selected={attView === 'calendar'} onClick={() => setAttView('calendar')}>Calendar</button>
-      </div></div>;
-    if (attView === 'calendar') return <>{head}{CalendarView()}</>;
+    const head = <div className="ph"><div><h1>Attendance</h1><p>Daily check-in and check-out</p></div></div>;
     const d = attDate, dt = parse(d), hol = holidayOn(d)[0];
     const shift = (n: number) => { const next = ymd(addDays(dt, n)); setAttDate(n === 0 || next > T0 ? T0 : next); };
     const nav = <div className="card ch" style={{ padding: '6px 6px 6px 14px' }}><div><h2 style={{ fontSize: 15 }}>{d === T0 ? 'Today · ' : ''}{DAY[dt.getDay()]} {dt.getDate()} {MON[dt.getMonth()]}</h2></div>

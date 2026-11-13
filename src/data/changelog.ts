@@ -16,6 +16,13 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-11-13',
+    title: 'Calendar is its own tab',
+    entries: [
+      { type: 'improvement', description: 'The Manager bottom bar now has four tabs: Tasks, Leaves, Attendance and Calendar. Attendance shows only attendance (the Table / Calendar switch is gone); the Calendar tab shows meetings, leave, events, holidays and announcements.' },
+    ],
+  },
+  {
+    date: '2026-11-13',
     title: 'AI assistant (testing)',
     entries: [
       { type: 'feature', description: 'AI assistant (named "Voxel1_Daily assistant") on the Manager screen (✨ next to the avatar), Kesari only while testing. A chat answers questions such as "Who has no task today?", "Which tasks are stuck, and why?", delays, late arrivals and a status summary, from live task, attendance and leave data. Read-only: it never changes anything. Server function ai-assistant calls Google Gemini (secret GEMINI_API_KEY, optional GEMINI_MODEL, default gemini-3.8-flash); access via can_use_ai_assistant (migration 0102); set app_config.aiAssistantScope = "managers" to open it to all managers.' },
