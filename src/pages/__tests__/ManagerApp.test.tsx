@@ -46,7 +46,7 @@ vi.mock('../../services/hrService', () => ({ hrService: {
   getAttendance: vi.fn(async () => []),
 } }));
 vi.mock('../../services/calendar.service', () => ({ calendarService: {
-  listEvents: vi.fn(async () => []), addEvent: vi.fn(async () => ({})), deleteEvent: vi.fn(), addHoliday: vi.fn(async () => 0), deleteHoliday: vi.fn(async () => 0),
+  listEvents: vi.fn(async () => []), addEvent: vi.fn(async () => ({})), addAnnouncement: vi.fn(async () => ({})), deleteEvent: vi.fn(), addHoliday: vi.fn(async () => 0), deleteHoliday: vi.fn(async () => 0),
 } }));
 vi.mock('../../services/assignedTask.service', async (orig) => {
   const real = await orig<typeof import('../../services/assignedTask.service')>();
@@ -462,6 +462,22 @@ describe('manager app', () => {
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Client review' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add to calendar' }));
     await waitFor(() => expect(calendarService.addEvent).toHaveBeenCalledWith('Client review', today));
+  });
+
+  it('makes an announcement with a megaphone button, an optional time, and shows the time on the calendar', async () => {
+    vi.mocked(calendarService.listEvents).mockResolvedValue([{ id: 'a1', title: 'Team meeting', event_date: today, event_time: '11:00:00', created_by: null, kind: 'announcement' }] as any);
+    try {
+      render(<ManagerApp user={user} />);
+      fireEvent.click(screen.getByRole('button', { name: /^Attendance/ }));
+      fireEvent.click(screen.getByRole('tab', { name: 'Calendar' }));
+      expect(await screen.findByText('Announcement · 11:00 am')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Make an announcement' }));
+      fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Review at 4' } });
+      fireEvent.change(screen.getByLabelText(/^Time/), { target: { value: '16:00' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Announce' }));
+      await waitFor(() => expect(calendarService.addAnnouncement).toHaveBeenCalledWith('Review at 4', today, '16:00'));
+      expect(await screen.findByText(/Announced to everyone today · 4:00 pm/)).toBeInTheDocument();
+    } finally { vi.mocked(calendarService.listEvents).mockResolvedValue([]); }
   });
 
   it('adds a holiday, reloads leave and says how many leaves got the day back', async () => {

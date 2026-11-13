@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Megaphone } from 'lucide-react';
 import { User, Employee, LeaveRequest, CustomLeaveType, Holiday, LeaveBalance, Attendance } from '../types';
 import { employeeService } from '../services/employee.service';
 import { hrService } from '../services/hrService';
@@ -61,8 +62,9 @@ const I = {
   plus: <Svg sw={2.6}><path d="M12 5v14M5 12h14" /></Svg>,
   moon: <Svg w={18}><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></Svg>,
   out: <Svg w={18}><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H4" /></Svg>,
-  mic: <Svg w={20} sw={2.2}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" /></Svg>,
-  micS: <Svg w={15} sw={2.4}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" /></Svg>,
+  // Announcement: the same megaphone as the employee home banner.
+  mic: <Megaphone size={20} strokeWidth={2.2} aria-hidden="true" />,
+  micS: <Megaphone size={15} strokeWidth={2.4} aria-hidden="true" />,
 };
 const SIC: Record<TaskStatus, React.ReactNode> = {
   NOT_STARTED: <svg className="sic ns" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="1.8" /></svg>,
@@ -295,12 +297,13 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [evK, setEvK] = useState<'ev' | 'hd' | 'an'>('ev');
   const [evTitle, setEvTitle] = useState('');
   const [evDate, setEvDate] = useState(() => ymd(new Date()));
+  const [evTime, setEvTime] = useState('');
   const [evBusy, setEvBusy] = useState(false);
   const swipe = useRef(new Map<string, { x0: number; y0: number; dx: number; on: boolean; dead: boolean; at: number }>());
   const openTask = (id: string) => { setSheetText(allTasks.find(t => t.id === id)?.description || ''); setSheet({ kind: 'task', id }); };
   const openEvent = () => { setEvK('ev'); setEvTitle(''); setEvDate(selDay); setSheet({ kind: 'event' }); };
   // Announcements go out today or on a later day, never in the past.
-  const openAnnounce = () => { setEvK('an'); setEvTitle(''); setEvDate(selDay < T0 ? T0 : selDay); setSheet({ kind: 'event' }); };
+  const openAnnounce = () => { setEvK('an'); setEvTitle(''); setEvTime(''); setEvDate(selDay < T0 ? T0 : selDay); setSheet({ kind: 'event' }); };
   useEffect(() => {
     if (route !== 'attendance' || attView !== 'table') return;
     let alive = true;
@@ -859,7 +862,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       const out: Item[] = [];
       holidayOn(d).forEach(h => out.push({ k: 'hd', t: h.name, sub: 'Holiday', id: h.id, removable: !h.isGovernment }));
       events.filter(e => e.event_date === d).forEach(e => out.push(e.kind === 'announcement'
-        ? { k: 'an', t: e.title, sub: `Announcement${e.created_by ? ` · ${empName(e.created_by) || 'Manager'}` : ''}`, id: e.id, removable: true }
+        ? { k: 'an', t: e.title, sub: `Announcement${e.event_time ? ` · ${punchTimeLabel(e.event_time)}` : ''}${e.created_by ? ` · ${empName(e.created_by) || 'Manager'}` : ''}`, id: e.id, removable: true }
         : { k: 'ev', t: e.title, sub: 'Event', id: e.id, removable: true }));
       if (isWk(parse(d)) && !holidayOn(d).length) leaves.filter(l => l.status === 'APPROVED' && l.startDate <= d && l.endDate >= d)
         .forEach(l => out.push({ k: 'lv', t: l.employeeName, sub: `${typeName(l.type)} leave${l.startDate !== l.endDate ? ` · ${range(l.startDate, l.endDate)}` : ''}` }));
@@ -927,7 +930,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       setBusy(true);
       try {
         if (k === 'ev') { await calendarService.addEvent(title, date); await loadCalendar(); setSheet(null); say(`${title.trim()} added · ${dshort(date)}`); return; }
-        if (k === 'an') { await calendarService.addAnnouncement(title, date); await loadCalendar(); setSheet(null); say(date === T0 ? 'Announced to everyone today' : `Announcement set for ${dshort(date)}`); return; }
+        if (k === 'an') { await calendarService.addAnnouncement(title, date, evTime); await loadCalendar(); setSheet(null); say(`${date === T0 ? 'Announced to everyone today' : `Announcement set for ${dshort(date)}`}${evTime ? ` · ${punchTimeLabel(evTime)}` : ''}`); return; }
         const changed = await calendarService.addHoliday(title, date);
         await Promise.all([loadCalendar(), loadLeaves()]); setSheet(null);
         say(`${title.trim()} added · ${dshort(date)}${changed ? ` · ${plural(changed, 'leave')} given back` : ''}`);
@@ -946,6 +949,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         : <input className="inp" id="evT" placeholder={k === 'ev' ? 'e.g. Client review' : 'e.g. Company day off'} autoComplete="off" maxLength={200} value={title} onChange={e => setTitle(e.target.value)} />}
       <label className="lab" htmlFor="evD" style={{ marginTop: 14 }}>Date</label>
       <input className="inp" type="date" id="evD" min={k === 'an' ? T0 : undefined} value={date} onChange={e => setDate(e.target.value)} />
+      {k === 'an' && <><label className="lab" htmlFor="evTm" style={{ marginTop: 14 }}>Time <span style={{ fontWeight: 500 }}>(optional)</span></label>
+        <input className="inp" type="time" id="evTm" value={evTime} onChange={e => setEvTime(e.target.value)} /></>}
       {k === 'hd' && <p className="small">Holidays are shared with the whole company and never count as leave. Anyone already on leave that day, approved or waiting, gets the day back in their balance, even for a past date.</p>}
       {k === 'an' && <p className="small">Every employee sees this on their home screen {date === T0 ? 'today' : date ? `on ${dshort(date)}` : 'on that day'}.</p>}
       <button className="btn pri lg wide" style={{ marginTop: 18 }} disabled={!title.trim() || !date || busy || (k === 'an' && date < T0)} onClick={() => void go()}>{busy ? (k === 'an' ? 'Announcing…' : 'Adding…') : k === 'an' ? 'Announce' : 'Add to calendar'}</button>

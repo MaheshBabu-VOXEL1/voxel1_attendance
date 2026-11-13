@@ -4,12 +4,13 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import EmployeeDay from '../EmployeeDay';
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ login: vi.fn() }) }));
 vi.mock('../../services/supabase', async (original) => { const actual = await original<typeof import('../../services/supabase')>(); return { ...actual, supabase: { ...actual.supabase, rpc: vi.fn(async () => ({ data: false, error: null })) } }; });
-const mocks = vi.hoisted(() => ({ status: vi.fn(), stuck: vi.fn(), leave: vi.fn(), refresh: vi.fn(), extra: [] as any[], unpaid: null as any, leaves: [] as any[], active: {checkIn:'09:00'} as any }));
+const mocks = vi.hoisted(() => ({ status: vi.fn(), stuck: vi.fn(), leave: vi.fn(), refresh: vi.fn(), extra: [] as any[], unpaid: null as any, leaves: [] as any[], active: {checkIn:'09:00'} as any, ann: [] as any[] }));
 vi.mock('../../context/ThemeContext', () => ({ useTheme: () => ({ darkMode: false }) }));
 vi.mock('../../context/SubscriptionContext', () => ({ useSubscription: () => ({ canPerformAction: () => true }) }));
 vi.mock('../../services/assignedTask.service', async (original) => ({ ...(await original<typeof import('../../services/assignedTask.service')>()), assignedTaskService: { setStatus: mocks.status, markStuck: mocks.stuck } }));
 vi.mock('../../services/employeeService', () => ({ employeeService: { applyForLeave: mocks.leave } }));
 vi.mock('../../hooks/useAssignedTasks', () => ({ useAssignedTasks: () => ({ loading: false, error: '', refresh: mocks.refresh, tasks: [{id:'task1',description:'Review model',project_name:'Vyoma',created:'2026-10-01T09:00:00Z',status:'START',completed_at:null}, {id:'task2',description:'Old drawing',status:'END',completed_at:'2020-01-01T10:00:00Z'}, ...mocks.extra] }) }));
+vi.mock('../../services/calendar.service', () => ({ calendarService: { announcementsOn: vi.fn(async () => mocks.ann) } }));
 vi.mock('../../services/hrService', () => ({ hrService: {
   getLeaveBalance: async () => ({CASUAL_SICK:12,PAID:7}), getLeaves: async () => mocks.leaves,
   getLeaveTypes: async () => [{id:'CASUAL_SICK',name:'Casual & Sick Leave',color:'',hasBalance:true},{id:'PAID',name:'Paid Leave',color:'',hasBalance:true},{id:'UNPAID',name:'Unpaid Leave',color:'',hasBalance:false}],
@@ -20,7 +21,7 @@ vi.mock('../../services/hrService', () => ({ hrService: {
 } }));
 describe('employee reference screen', () => {
   beforeEach(() => {
-    vi.clearAllMocks(); mocks.extra.length = 0; mocks.unpaid = null; mocks.leaves = []; mocks.active = {checkIn:'09:00'};
+    vi.clearAllMocks(); mocks.extra.length = 0; mocks.ann.length = 0; mocks.unpaid = null; mocks.leaves = []; mocks.active = {checkIn:'09:00'};
     HTMLDialogElement.prototype.showModal = function() { this.setAttribute('open',''); };
     HTMLDialogElement.prototype.close = function() { this.removeAttribute('open'); };
   });
@@ -153,5 +154,13 @@ describe('employee reference screen', () => {
     const d = new Date(); d.setDate(d.getDate() + 3);
     fireEvent.change(screen.getByLabelText('From'), {target:{value:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}});
     expect(document.querySelector('.sheet .msg')!.textContent).toContain('unpaid, 3 used this year');
+  });
+  it('shows the date and time on an announcement', async () => {
+    const d = new Date(); const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    mocks.ann.push({ id: 'a1', title: 'Team meeting in Madhapur', event_date: iso, event_time: '11:00:00', created_by: null, kind: 'announcement' });
+    render(<EmployeeDay user={{id:'me'}} onNavigate={vi.fn()}/>);
+    const when = await waitFor(() => { const w = document.querySelector('.ann-when'); if (!w) throw new Error('no banner'); return w; });
+    expect(when.textContent).toBe(`${new Date(`${iso}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · 11:00 am`);
+    expect(screen.getByText('Team meeting in Madhapur')).toBeInTheDocument();
   });
 });

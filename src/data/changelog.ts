@@ -15,6 +15,15 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-11-13',
+    title: 'Announcement date, time and megaphone icon',
+    entries: [
+      { type: 'feature', description: 'Announcements can have a time (optional). The Manager announcement form has a Time field; the employee home banner shows the date and time (e.g. "Fri 13 Nov · 11:00 am") and the Manager calendar shows the time (migration 0101: calendar_events.event_time, add_calendar_announcement with p_time).' },
+      { type: 'improvement', description: 'Announcements use a megaphone icon instead of the microphone (which looked like voice recording), on the employee banner, the Manager calendar button, the Announce tab and the calendar list.' },
+      { type: 'improvement', description: 'The add-task form no longer shows the "Recurring task" heading; only the "Repeat weekly" option remains.' },
+    ],
+  },
+  {
     date: '2026-11-03',
     title: 'Today view shows only current staff',
     entries: [

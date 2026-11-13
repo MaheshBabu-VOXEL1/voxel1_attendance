@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { organizationService } from './organization.service';
 
-export interface CalendarEvent { id: string; title: string; event_date: string; created_by: string | null; kind?: 'event' | 'announcement' }
+export interface CalendarEvent { id: string; title: string; event_date: string; created_by: string | null; kind?: 'event' | 'announcement'; /** Announcement time "HH:MM:SS" (optional, migration 0101). */ event_time?: string | null }
 
 /** Company calendar: events and manager announcements live in calendar_events; holidays stay in the shared settings list so leave day counts use them. */
 export const calendarService = {
@@ -18,8 +18,8 @@ export const calendarService = {
     return data;
   },
   /** Manager announcement for a date: every employee sees it on their home screen on that day. */
-  async addAnnouncement(text: string, date: string): Promise<CalendarEvent> {
-    const { data, error } = await supabase.rpc('add_calendar_announcement', { p_text: text.trim(), p_date: date });
+  async addAnnouncement(text: string, date: string, time = ''): Promise<CalendarEvent> {
+    const { data, error } = await supabase.rpc('add_calendar_announcement', { p_text: text.trim(), p_date: date, p_time: time || null });
     if (error) throw new Error(error.message);
     return data;
   },

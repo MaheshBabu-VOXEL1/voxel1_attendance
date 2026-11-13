@@ -3,8 +3,7 @@ export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
 export function RecurrencePicker({ days, onChange, disabled = false }: {
   days: number[]; onChange: (days: number[]) => void; disabled?: boolean;
 }) {
-  return <fieldset disabled={disabled} style={{ padding: 12, border: '1px solid var(--line, #cbd5e1)', borderRadius: 10 }}>
-    <legend>Recurring task</legend>
+  return <fieldset aria-label="Recurring task" disabled={disabled} style={{ padding: 12, border: '1px solid var(--line, #cbd5e1)', borderRadius: 10 }}>
     <label><input type="checkbox" checked={days.length > 0} onChange={e => onChange(e.target.checked ? [1] : [])} /> Repeat weekly</label>
     {days.length > 0 && <>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 10 }}>
