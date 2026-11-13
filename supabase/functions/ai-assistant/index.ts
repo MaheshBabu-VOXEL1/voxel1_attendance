@@ -54,15 +54,17 @@ Deno.serve(async (req) => {
   try {
     const today = ymd(new Date());
     const in14 = ymd(new Date(Date.now() + 14 * 864e5));
-    const [people, tasks, attendance, leaves, cfgRow] = await Promise.all([
-      db.from('profiles').select('id,name,role,status,department').neq('status', 'INACTIVE'),
-      db.from('assigned_tasks').select('*').order('created', { ascending: false }).limit(800),
-      db.from('attendance').select('employee_id,check_in,check_out,status').eq('date', today),
-      db.from('leaves').select('employee_id,employee_name,type,start_date,end_date,total_days,status')
+    const dayStart = new Date(`${today}T00:00:00+05:30`).toISOString();
+    const [people, openTasks, doneToday, attendance, leaves, cfgRow] = await Promise.all([
+      db.from('profiles').select('id,name,role,status').neq('status', 'INACTIVE'),
+      db.from('assigned_tasks').select('*').neq('status', 'END').limit(1500),
+      db.from('assigned_tasks').select('*').eq('status', 'END').gte('completed_at', dayStart).limit(500),
+      db.from('attendance').select('employee_id,check_in,check_out').eq('date', today),
+      db.from('leaves').select('employee_id,employee_name,type,start_date,end_date,status')
         .lte('start_date', in14).gte('end_date', today).in('status', ['APPROVED', 'PENDING_MANAGER', 'PENDING_HR']),
       db.from('settings').select('value').eq('key', 'app_config').limit(1).maybeSingle(),
     ]);
-    for (const r of [people, tasks, attendance, leaves]) if (r.error) throw r.error;
+    for (const r of [people, openTasks, doneToday, attendance, leaves]) if (r.error) throw r.error;
 
     let cfg: any = {};
     try { cfg = typeof cfgRow.data?.value === 'string' ? JSON.parse(cfgRow.data.value) : (cfgRow.data?.value || {}); } catch { /* defaults */ }
@@ -70,64 +72,74 @@ Deno.serve(async (req) => {
     const lateAfter = toMin(officeStart) + (typeof cfg.lateGracePeriod === 'number' ? cfg.lateGracePeriod : 15);
 
     const nameOf = new Map<string, string>((people.data || []).map((p: any) => [String(p.id), p.name || 'Unknown']));
-    const team = (people.data || []).filter((p: any) => p.role === 'EMPLOYEE' || p.role === 'MANAGER')
-      .map((p: any) => ({ name: p.name, role: p.role, department: p.department || null }));
+    const employees = (people.data || []).filter((p: any) => p.role === 'EMPLOYEE');
+    const who = (t: any) => (t.employee_id ? (t.employee_name || nameOf.get(String(t.employee_id)) || 'Unknown') : 'Unassigned');
+    const clip = (v: unknown, n = 90) => (typeof v === 'string' ? v.slice(0, n) : v);
 
-    // Open work plus anything finished today; older finished tasks are history the questions rarely need.
-    const relevant = (tasks.data || []).filter((t: any) => t.status !== 'END' || (t.completed_at && ymd(new Date(t.completed_at)) === today));
-    const taskRows = relevant.map((t: any) => {
-      const overdueDays = t.status !== 'END' && t.due_date && t.due_date < today
-        ? Math.round((Date.parse(today) - Date.parse(t.due_date)) / 864e5) : 0;
-      return {
-        task: t.description, project: t.project_name || null,
-        assignee: t.employee_id ? (t.employee_name || nameOf.get(String(t.employee_id)) || 'Unknown') : 'Unassigned',
-        assigned_by: t.manager_name || nameOf.get(String(t.assigned_by)) || null,
-        status: t.status === 'END' ? 'DONE_TODAY' : t.status, priority: t.priority || null,
-        due: t.due_date || null, overdue_days: overdueDays || undefined, half_day: t.half_day || undefined,
-        stuck: t.status === 'STUCK' ? { done_percent: t.stuck_progress ?? null, reason: t.stuck_reason || null, since: t.stuck_at || null } : undefined,
-        started_at: t.started_at || null, completed_at: t.completed_at || null, created: t.created,
-      };
-    });
+    const open = openTasks.data || [];
+    const compact = (t: any) => {
+      const od = t.due_date && t.due_date < today ? Math.round((Date.parse(today) - Date.parse(t.due_date)) / 864e5) : 0;
+      const o: Record<string, unknown> = { who: who(t), task: clip(t.description), status: t.status };
+      if (t.project_name) o.project = t.project_name;
+      if (t.due_date) o.due = t.due_date;
+      if (od > 0) o.overdue_days = od;
+      if (t.half_day) o.half_day = true;
+      if (t.status === 'STUCK') { o.done_percent = t.stuck_progress ?? null; o.reason = clip(t.stuck_reason, 160) || null; }
+      return o;
+    };
 
-    const attRows = (attendance.data || []).map((a: any) => {
+    // Answers that need counting are worked out here, in code, so they are exact. The model only phrases them.
+    const att = (attendance.data || []).map((a: any) => {
       const inT = hhmm(a.check_in);
       return { name: nameOf.get(String(a.employee_id)) || 'Unknown', check_in: inT, check_out: hhmm(a.check_out),
-        late: !!inT && toMin(inT) > lateAfter, still_in: !!a.check_in && !a.check_out };
+        late: !!inT && toMin(inT) > lateAfter };
     });
-    const checkedIn = new Set(attRows.map(a => a.name));
-    const onLeaveToday = (leaves.data || []).filter((l: any) => l.status === 'APPROVED' && l.start_date <= today && l.end_date >= today)
-      .map((l: any) => l.employee_name);
+    const checkedIn = new Set(att.map(a => a.name));
+    const onLeave = new Set((leaves.data || []).filter((l: any) => l.status === 'APPROVED' && l.start_date <= today && l.end_date >= today)
+      .map((l: any) => String(l.employee_id)));
+    const hasOpen = new Set(open.map((t: any) => String(t.employee_id)));
+    const doneBy: Record<string, number> = {};
+    for (const t of doneToday.data || []) doneBy[who(t)] = (doneBy[who(t)] || 0) + 1;
 
     const context = {
-      today, timezone: TZ, office_start: officeStart, late_after: `${String(Math.floor(lateAfter / 60)).padStart(2, '0')}:${String(lateAfter % 60).padStart(2, '0')}`,
-      team, tasks: taskRows, attendance_today: attRows,
-      not_checked_in_today: team.map(p => p.name).filter(n => !checkedIn.has(n) && !onLeaveToday.includes(n)),
-      leave: (leaves.data || []).map((l: any) => ({ name: l.employee_name, type: l.type, from: l.start_date, to: l.end_date, days: l.total_days, status: l.status })),
+      today, office_start: officeStart, late_after_time: `${String(Math.floor(lateAfter / 60)).padStart(2, '0')}:${String(lateAfter % 60).padStart(2, '0')}`,
+      employees_with_no_open_task: employees.filter((p: any) => !hasOpen.has(String(p.id)) && !onLeave.has(String(p.id))).map((p: any) => p.name),
+      employees_on_approved_leave_today: employees.filter((p: any) => onLeave.has(String(p.id))).map((p: any) => p.name),
+      stuck_tasks: open.filter((t: any) => t.status === 'STUCK').map(compact),
+      overdue_tasks: open.filter((t: any) => t.due_date && t.due_date < today).map(compact),
+      late_today: att.filter(a => a.late),
+      not_checked_in_today: employees.filter((p: any) => !checkedIn.has(p.name) && !onLeave.has(String(p.id))).map((p: any) => p.name),
+      counts: { open_tasks: open.length, stuck: open.filter((t: any) => t.status === 'STUCK').length,
+        overdue: open.filter((t: any) => t.due_date && t.due_date < today).length, done_today: (doneToday.data || []).length },
+      done_today_by_person: doneBy,
+      attendance_today: att,
+      leave_next_14_days: (leaves.data || []).map((l: any) => ({ name: l.employee_name, type: l.type, from: l.start_date, to: l.end_date, status: l.status })),
+      all_open_tasks: open.map(compact),
     };
 
     const system = [
       'You are the Voxel1 Daily app assistant for managers at Voxel1 (an engineering/BIM firm in Hyderabad).',
-      'Answer ONLY from the JSON data below; it is live data from the app as of now. If the data does not contain the answer, say so plainly. Never invent people, tasks or numbers.',
-      'Be short and practical: lead with the direct answer, then a compact list (one line per person or task). Use people\'s names. Use 12-hour times (e.g. 10:34 am) and dates like "13 Nov".',
-      'Statuses: NOT_STARTED, START (started), PROGRESS (in progress), STUCK (blocked; see stuck.done_percent and stuck.reason), DONE_TODAY. "Delayed" or "overdue" means overdue_days > 0.',
-      '"No task" means a team member with no task whose status is not DONE_TODAY. Someone is late if attendance_today.late is true.',
-      'You cannot change anything in the app; if asked to assign, edit or announce, explain that this version only answers questions.',
-      'Reply in the language the manager writes in (English, Telugu or Hinglish/Tenglish).',
-      '',
-      'DATA:', JSON.stringify(context),
+      'Answer ONLY from the JSON data below (live app data). The lists employees_with_no_open_task, stuck_tasks, overdue_tasks, late_today, not_checked_in_today and counts are already exact: copy them, never recount or filter them yourself. If the data does not contain the answer, say so. Never invent people, tasks or numbers.',
+      'Be short: lead with the direct answer, then one line per person or task. Use names. Use 12-hour times (10:34 am) and dates like "13 Nov". Statuses: NOT_STARTED, START, PROGRESS, STUCK. Telling a long list: show up to 15 and say how many more.',
+      'You cannot change anything; if asked to assign, edit or announce, say this version only answers questions.',
+      'Reply in the language the manager writes in (English, Telugu or Hinglish).',
+      '', 'DATA:', JSON.stringify(context),
     ].join('\n');
 
     const model = Deno.env.get('GEMINI_MODEL') || MODEL_DEFAULT;
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    const call = (gen: Record<string, unknown>) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.text }] })),
-        generationConfig: { maxOutputTokens: 2048 },
+        generationConfig: gen,
       }),
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(40_000),
     });
+    // Little "thinking" = much faster. If this model does not accept that setting, retry without it.
+    let res = await call({ maxOutputTokens: 900, temperature: 0.2, thinkingConfig: { thinkingBudget: 0 } });
+    if (res.status === 400) res = await call({ maxOutputTokens: 900, temperature: 0.2 });
     const out = await res.json().catch(() => null);
     if (!res.ok) {
       console.error('[ai-assistant] Gemini error', res.status, JSON.stringify(out?.error || out).slice(0, 500));
