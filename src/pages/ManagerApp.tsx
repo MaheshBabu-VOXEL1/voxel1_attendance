@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Megaphone } from 'lucide-react';
+import AnnouncementIcon from '../components/AnnouncementIcon';
 import { User, Employee, LeaveRequest, CustomLeaveType, Holiday, LeaveBalance, Attendance } from '../types';
 import { employeeService } from '../services/employee.service';
 import { hrService } from '../services/hrService';
@@ -62,9 +62,9 @@ const I = {
   plus: <Svg sw={2.6}><path d="M12 5v14M5 12h14" /></Svg>,
   moon: <Svg w={18}><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></Svg>,
   out: <Svg w={18}><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H4" /></Svg>,
-  // Announcement: the same megaphone as the employee home banner.
-  mic: <Megaphone size={20} strokeWidth={2.2} aria-hidden="true" />,
-  micS: <Megaphone size={15} strokeWidth={2.4} aria-hidden="true" />,
+  // Announcement: filled megaphone (the calendar button shows it in a purple circle).
+  mic: <span className="ann-btn-ic"><AnnouncementIcon size={17} /></span>,
+  micS: <AnnouncementIcon size={15} />,
 };
 const SIC: Record<TaskStatus, React.ReactNode> = {
   NOT_STARTED: <svg className="sic ns" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="1.8" /></svg>,
@@ -900,7 +900,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     return <>
       <div className="card">
         <div className="ch" style={{ padding: '10px 10px 0 16px' }}><h2>{MONL[calM]} {calY}</h2>
-          <div className="n"><button className="ibtn" aria-label="Make an announcement" title="Announcement" style={{ color: 'var(--ann)' }} onClick={openAnnounce}>{I.mic}</button>
+          <div className="n"><button className="ibtn" aria-label="Make an announcement" title="Announcement" onClick={openAnnounce}>{I.mic}</button>
             <button className="ibtn" aria-label="Add event or holiday" style={{ color: 'var(--steel)' }} onClick={openEvent}>{I.plus}</button>
             <button className="ibtn" aria-label="Previous month" onClick={() => move(-1)}>{I.l}</button>
             <button className="btn ghost" style={{ height: 36, padding: '0 10px' }} onClick={() => move(0)}>Today</button>

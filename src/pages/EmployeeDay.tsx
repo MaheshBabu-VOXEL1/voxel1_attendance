@@ -1,6 +1,7 @@
 import { recurrenceLabel } from '../components/tasks/RecurrencePicker';
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Eye, Megaphone, Search, X } from 'lucide-react';
+import { Check, ChevronDown, Eye, Search, X } from 'lucide-react';
+import AnnouncementIcon from '../components/AnnouncementIcon';
 import { hrService } from '../services/hrService';
 import { calendarService, CalendarEvent } from '../services/calendar.service';
 import { employeeService } from '../services/employeeService';
@@ -203,7 +204,7 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
       <section className="hero" aria-labelledby="dayTitle"><h1 id="dayTitle">{date(today).toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' })}</h1>
         <div className="att"><div className="att-l"><span className={`dot${active ? '' : ' off'}`} /><div><b>{!ready ? 'Loading attendance…' : active ? 'Checked in' : attendance?.checkOut ? 'Checked out' : 'Not checked in'}</b><span>{punchTime ? `at ${punchTimeLabel(punchTime)}` : leaveToday ? 'On leave today · checking in gives the day back' : 'Start your day'}</span><button ref={apply} className="linkbtn al" onClick={showLeave} disabled={!ready || !canWrite}>Apply leave</button></div></div><button className={`btn att-btn ${active ? 'leave-btn' : 'in'}`} disabled={!ready || !canWrite} onClick={() => onNavigate(active ? 'attendance-finish' : 'attendance-quick-office')}>{active ? 'Check out' : 'Check in'}</button></div>
       </section>
-      {!!shownAnn.length && <section className="ann" aria-label="Announcements">{shownAnn.map(a => <div className="ann-i" key={a.id}><span className="mic"><Megaphone size={18} aria-hidden="true" /></span><div className="t"><span>Announcement</span><time className="ann-when" dateTime={a.event_time ? `${a.event_date}T${a.event_time.slice(0, 5)}` : a.event_date}>{date(a.event_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}{a.event_time ? ` · ${punchTimeLabel(a.event_time)}` : ''}</time><p>{a.title}</p></div><button type="button" className="ann-x" aria-label="Close announcement" onClick={() => hideAnnouncement(a.id)}><X size={18} aria-hidden="true" /></button></div>)}</section>}
+      {!!shownAnn.length && <section className="ann" aria-label="Announcements">{shownAnn.map(a => <div className="ann-i" key={a.id}><span className="mic"><AnnouncementIcon size={18} /></span><div className="t"><span>Announcement</span><time className="ann-when" dateTime={a.event_time ? `${a.event_date}T${a.event_time.slice(0, 5)}` : a.event_date}>{date(a.event_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}{a.event_time ? ` · ${punchTimeLabel(a.event_time)}` : ''}</time><p>{a.title}</p></div><button type="button" className="ann-x" aria-label="Close announcement" onClick={() => hideAnnouncement(a.id)}><X size={18} aria-hidden="true" /></button></div>)}</section>}
       {error && <p className="err" role="alert">{error}</p>}
       <div className="tasks-h"><h2>My Tasks</h2><span>{tasks.filter(t => t.status !== 'END').length} open · {tasks.filter(doneToday).length} done today</span></div>
       <div className="search"><Search size={18} /><label htmlFor="task-query" className="vh">Search project or task</label><input id="task-query" type="search" placeholder="Search project or task" value={query} onChange={e => setQuery(e.target.value)} /></div>
