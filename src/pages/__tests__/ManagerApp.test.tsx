@@ -45,6 +45,8 @@ vi.mock('../../services/hrService', () => ({ hrService: {
   getActiveAttendance: vi.fn(async () => null),
   getAttendance: vi.fn(async () => []),
 } }));
+const ai = vi.hoisted(() => ({ canUse: vi.fn(async () => false) }));
+vi.mock('../../services/aiAssistant.service', async (orig) => ({ ...(await orig<typeof import('../../services/aiAssistant.service')>()), aiAssistantService: { canUse: ai.canUse, ask: vi.fn() } }));
 vi.mock('../../services/calendar.service', () => ({ calendarService: {
   listEvents: vi.fn(async () => []), addEvent: vi.fn(async () => ({})), addAnnouncement: vi.fn(async () => ({})), deleteEvent: vi.fn(), addHoliday: vi.fn(async () => 0), deleteHoliday: vi.fn(async () => 0),
 } }));
@@ -603,5 +605,20 @@ describe('recurring tasks', () => {
     fireEvent.click(within(controls[controls.length - 1]).getByRole('checkbox', { name: 'Repeat weekly' }));
     await waitFor(() => expect(assignedTaskService.setRecurrence).toHaveBeenCalledWith('t2', [1]));
     expect(assignedTaskService.managerUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('AI assistant access', () => {
+  it('shows the AI button only to allowed people and opens the chat', async () => {
+    ai.canUse.mockResolvedValueOnce(true);
+    render(<ManagerApp user={user} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'AI assistant' }));
+    expect(screen.getByRole('button', { name: 'Who has no task today?' })).toBeInTheDocument();
+  });
+  it('hides the AI button from everyone else', async () => {
+    ai.canUse.mockResolvedValueOnce(false);
+    render(<ManagerApp user={user} />);
+    await waitFor(() => expect(ai.canUse).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: 'AI assistant' })).toBeNull();
   });
 });

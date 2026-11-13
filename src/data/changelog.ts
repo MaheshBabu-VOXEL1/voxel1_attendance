@@ -16,6 +16,13 @@ export interface ChangelogRelease {
 export const changelog: ChangelogRelease[] = [
   {
     date: '2026-11-13',
+    title: 'AI assistant (testing)',
+    entries: [
+      { type: 'feature', description: 'AI assistant on the Manager screen (✨ next to the avatar), Kesari only while testing. A chat answers questions such as "Who has no task today?", "Which tasks are stuck, and why?", delays, late arrivals and a status summary, from live task, attendance and leave data. Read-only: it never changes anything. Server function ai-assistant calls Google Gemini (secret GEMINI_API_KEY, optional GEMINI_MODEL, default gemini-3.8-flash); access via can_use_ai_assistant (migration 0102); set app_config.aiAssistantScope = "managers" to open it to all managers.' },
+    ],
+  },
+  {
+    date: '2026-11-13',
     title: 'Announcement date, time and megaphone icon',
     entries: [
       { type: 'feature', description: 'Announcements can have a time (optional). The Manager announcement form has a Time field; the employee home banner shows the date and time (e.g. "Fri 13 Nov · 11:00 am") and the Manager calendar shows the time (migration 0101: calendar_events.event_time, add_calendar_announcement with p_time).' },

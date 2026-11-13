@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AnnouncementIcon from '../components/AnnouncementIcon';
+import { Sparkles } from 'lucide-react';
+import AiAssistantChat from '../components/ai/AiAssistantChat';
+import { aiAssistantService, AiMessage } from '../services/aiAssistant.service';
 import { User, Employee, LeaveRequest, CustomLeaveType, Holiday, LeaveBalance, Attendance } from '../types';
 import { employeeService } from '../services/employee.service';
 import { hrService } from '../services/hrService';
@@ -240,7 +243,11 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   }, [pop, placePop]);
 
   // ---------- sheet ----------
-  const [sheet, setSheet] = useState<null | { kind: 'task'; id: string } | { kind: 'event' } | { kind: 'account' } | { kind: 'person'; id: string }>(null);
+  const [sheet, setSheet] = useState<null | { kind: 'task'; id: string } | { kind: 'event' } | { kind: 'account' } | { kind: 'person'; id: string } | { kind: 'ai' }>(null);
+  // AI assistant: only for people the database allows (Kesari while testing). The chat survives closing the sheet.
+  const [aiOk, setAiOk] = useState(false);
+  const [aiMsgs, setAiMsgs] = useState<AiMessage[]>([]);
+  useEffect(() => { let alive = true; void aiAssistantService.canUse().then(ok => { if (alive) setAiOk(ok); }); return () => { alive = false; }; }, []);
   // A phone keyboard covers the bottom of the screen without moving fixed elements; lift the sheet above it.
   const [kbLift, setKbLift] = useState(0);
   useEffect(() => {
@@ -449,6 +456,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   return <div className="mgr" data-theme={darkMode ? 'dark' : 'light'}>
     <header className="bar"><div className="bar-in">
       <div className="brand"><img alt="" src="/img/employee-day-mark.png" /><b>VOXEL1</b><AccountModeSwitch user={user} /></div>
+      {aiOk && <button className="ai-open" aria-label="AI assistant" title="AI assistant" onClick={() => setSheet({ kind: 'ai' })}><Sparkles size={18} aria-hidden="true" /></button>}
       <button className="avatar" aria-label="Account" onClick={() => setSheet({ kind: 'account' })}>{ini(user.name || 'Manager')}</button>
     </div></header>
     <main>
@@ -496,6 +504,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
       {sheet?.kind === 'event' && EventSheet()}
       {sheet?.kind === 'account' && AccountSheet()}
       {sheet?.kind === 'person' && PersonSheet(sheet.id)}
+      {sheet?.kind === 'ai' && <AiAssistantChat messages={aiMsgs} setMessages={setAiMsgs} onClose={() => setSheet(null)} />}
     </div>
     {stuckFor && <StuckNoteDialog title={stuckFor.description} busy={stuckBusy} error={stuckErr}
       onCancel={() => setStuckFor(null)} onSave={(p, r) => void saveStuck(p, r)} />}
