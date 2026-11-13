@@ -55,7 +55,7 @@ export default function AiAssistantChat({ messages, setMessages, onClose }: {
     <div className="grab" />
     <div className="ai-head">
       <span className="ai-mark"><Sparkles size={17} aria-hidden="true" /></span>
-      <h2 id="sheetT">Voxel_Daily assistant</h2><span className="ai-beta">Testing</span>
+      <h2 id="sheetT">Voxel1_Daily assistant</h2><span className="ai-beta">Testing</span>
       <button type="button" className="ai-x" aria-label="Close" onClick={onClose}><X size={18} aria-hidden="true" /></button>
     </div>
     <p className="ai-sub">Ask about today's tasks, attendance and leave. Answers come from live app data. It can't change anything.</p>
@@ -66,13 +66,13 @@ export default function AiAssistantChat({ messages, setMessages, onClose }: {
       {messages.map((m, i) => <div key={i} className={`ai-msg ${m.role === 'user' ? 'me' : 'bot'}`}>
         {m.role === 'user' ? m.text : <Reply text={m.text} />}</div>)}
       {busy && <div className="ai-msg bot ai-typing" role="status">Thinking…</div>}
-      {notSetUp && <div className="ai-note" role="alert">The Voxel_Daily assistant isn't connected yet. It will start answering once the Gemini key is added.</div>}
+      {notSetUp && <div className="ai-note" role="alert">The Voxel1_Daily assistant isn't connected yet. It will start answering once the Gemini key is added.</div>}
       {error && <div className="ai-err" role="alert">{error}</div>}
       <div ref={end} />
     </div>
 
     <form className="ai-ask" onSubmit={e => { e.preventDefault(); void send(text); }}>
-      <label className="vh" htmlFor="aiQ">Ask the Voxel_Daily assistant</label>
+      <label className="vh" htmlFor="aiQ">Ask the Voxel1_Daily assistant</label>
       <input id="aiQ" placeholder="Ask about your team…" autoComplete="off" maxLength={500} enterKeyHint="send"
         value={text} onChange={e => setText(e.target.value)} />
       <button type="submit" className="ai-send" aria-label="Send" disabled={!text.trim() || busy}><SendHorizontal size={18} aria-hidden="true" /></button>

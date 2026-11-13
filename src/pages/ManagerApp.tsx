@@ -456,7 +456,7 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   return <div className="mgr" data-theme={darkMode ? 'dark' : 'light'}>
     <header className="bar"><div className="bar-in">
       <div className="brand"><img alt="" src="/img/employee-day-mark.png" /><b>VOXEL1</b><AccountModeSwitch user={user} /></div>
-      {aiOk && <button className="ai-open" aria-label="Voxel_Daily assistant" title="Voxel_Daily assistant" onClick={() => setSheet({ kind: 'ai' })}><Sparkles size={18} aria-hidden="true" /></button>}
+      {aiOk && <button className="ai-open" aria-label="Voxel1_Daily assistant" title="Voxel1_Daily assistant" onClick={() => setSheet({ kind: 'ai' })}><Sparkles size={18} aria-hidden="true" /></button>}
       <button className="avatar" aria-label="Account" onClick={() => setSheet({ kind: 'account' })}>{ini(user.name || 'Manager')}</button>
     </div></header>
     <main>
