@@ -20,7 +20,7 @@ export const changelog: ChangelogRelease[] = [
     entries: [
       { type: 'feature', description: 'Announcements can have a time (optional). The Manager announcement form has a Time field; the employee home banner shows the date and time (e.g. "Fri 13 Nov · 11:00 am") and the Manager calendar shows the time (migration 0101: calendar_events.event_time, add_calendar_announcement with p_time).' },
       { type: 'improvement', description: 'Announcements use a megaphone icon instead of the microphone (which looked like voice recording), on the employee banner, the Manager calendar button, the Announce tab and the calendar list.' },
-      { type: 'improvement', description: 'The add-task form no longer shows the "Recurring task" heading; only the "Repeat weekly" option remains.' },
+      { type: 'improvement', description: 'Repeat weekly is now a repeat icon (two circling arrows) at the end of the Priority row instead of a "Repeat weekly" checkbox row; tapping it turns blue and shows the weekdays. The task sheet uses the same icon. The "Recurring task" heading is gone.' },
     ],
   },
   {

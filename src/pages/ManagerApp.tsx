@@ -17,7 +17,7 @@ import './ManagerApp.css';
 import AccountModeSwitch from '../components/AccountModeSwitch';
 import StuckNoteDialog from '../components/tasks/StuckNoteDialog';
 import TodayTeamTasks from '../components/tasks/TodayTeamTasks';
-import { RecurrencePicker, recurrenceLabel } from '../components/tasks/RecurrencePicker';
+import { RecurrencePicker, RecurrenceDays, RepeatButton, recurrenceLabel } from '../components/tasks/RecurrencePicker';
 
 /* Manager app: Tasks / Leaves / Calendar, built from the voxel1-manager.html design on live data. */
 
@@ -614,8 +614,9 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         <div className="c3"><span className="c3-l" id="cpPriL">Priority</span>
           <div className="pseg" role="radiogroup" aria-labelledby="cpPriL">{PRIORITIES.map(k =>
             <button key={k} type="button" role="radio" aria-checked={cpPri === k} className={k.toLowerCase()} onClick={() => setCpPri(k)}>{priorityLabel[k]}</button>)}</div>
+          <RepeatButton on={cpDays.length > 0} disabled={adding} onToggle={() => setCpDays(cpDays.length ? [] : [1])} />
         </div>
-        <RecurrencePicker days={cpDays} onChange={setCpDays} disabled={adding} />
+        {cpDays.length > 0 && <div className="c4" role="group" aria-label="Recurring task"><RecurrenceDays days={cpDays} onChange={setCpDays} disabled={adding} /></div>}
       </div>}
       <div className="tools today-tools">
         <button type="button" className="pf" aria-haspopup="listbox" onClick={e => menuProject(e.currentTarget, pfilter, v => setPfilter(v), true)}>
