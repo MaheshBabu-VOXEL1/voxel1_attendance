@@ -136,9 +136,20 @@ main{max-width:720px;margin:0 auto;padding:16px 16px calc(92px + env(safe-area-i
 .mb{position:relative;display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted);height:24px;border-radius:6px}
 .mb::after{content:"";position:absolute;inset:-10px -6px}
 
-.mb.ph{color:var(--faint);font-weight:500}
+.mb.unset{color:var(--faint);font-weight:500}
 .mb.over{color:var(--warn)} .mb.today{color:var(--info)}
 .mb svg{opacity:.8}
+.mb,.mp{font-family:inherit;line-height:1;white-space:nowrap;padding:0}
+.mb svg{flex:none}
+@media (max-width:520px){
+  /* Mobile: meta chips wrap as a tidy grid-like row — no dangling dot separators, same height/baseline for Assign and Due date */
+  .mt{gap:6px 14px;margin-top:6px}
+  .mt .sep{display:none}
+  .mt>*{min-height:24px;display:inline-flex;align-items:center}
+  .mb.unset{color:var(--muted);font-weight:500}
+  .mb.unset svg{opacity:.7}
+  .mb:not(.over):not(.today):not(.unset){max-width:100%}
+}
 .more{display:block;margin:14px auto 0;height:44px;padding:0 14px;font-size:13.5px;font-weight:600;color:var(--steel)}
 .hint{margin:10px 4px 0;font-size:12px;color:var(--faint)}
 

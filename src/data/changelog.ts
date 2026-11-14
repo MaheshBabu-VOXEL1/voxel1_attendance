@@ -15,6 +15,13 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-11-14',
+    title: 'Task row alignment on mobile',
+    entries: [
+      { type: 'fix', description: 'Manager task rows on a phone: "Assign" and "Due date" no longer sit higher than the other chips (a clashing class name added a stray bottom margin). Chips now share one baseline and wrap without dangling dots.' },
+    ],
+  },
+  {
     date: '2026-11-13',
     title: 'Calendar is its own tab',
     entries: [

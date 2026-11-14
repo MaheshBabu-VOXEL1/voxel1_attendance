@@ -688,10 +688,10 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     if (!isDone) bits.push(<button key="pr" className="mb prb" aria-label={`Priority: ${priorityLabel[pr]}. Change priority`}
       onClick={e => menuPriority(e.currentTarget, pr, v => void update(t, { pr: v as TaskPriority }))}>{prioPill(pr)}</button>);
     if (hide !== 'p') bits.push(<span key="p" className="mp">{t.project_name || 'No project'}</span>);
-    if (hide !== 'who') bits.push(<button key="w" className={`mb${t.employee_id ? '' : ' ph'}`} disabled={!edit}
+    if (hide !== 'who') bits.push(<button key="w" className={`mb${t.employee_id ? '' : ' unset'}`} disabled={!edit}
       onClick={e => menuWho(e.currentTarget, t.employee_id, v => void update(t, { who: v || null }))}>{t.employee_id ? dot(t.employee_id) : I.userS}{t.employee_id ? (t.employee_name || empName(t.employee_id)) : 'Assign'}</button>);
     if (isDone) bits.push(<span key="d" className="mp" style={{ color: 'var(--ok)' }}>Done {doneOn === T0 ? 'today' : doneOn ? short(doneOn) : ''}</span>);
-    else if (hide !== 'due' || dueInfo?.c === 'over' || (!!t.half_day && !!dueInfo)) bits.push(<button key="d" className={`mb${dueInfo ? (dueInfo.c ? ` ${dueInfo.c}` : '') : ' ph'}`}
+    else if (hide !== 'due' || dueInfo?.c === 'over' || (!!t.half_day && !!dueInfo)) bits.push(<button key="d" className={`mb${dueInfo ? (dueInfo.c ? ` ${dueInfo.c}` : '') : ' unset'}`}
       onClick={e => dueBar(e.currentTarget, (t.half_day && t.due_date === T0 ? HALF : t.due_date ?? null), v => void update(t, { due: v || null }))}>{I.calS}{dueInfo ? dueInfo.x : 'Due date'}</button>);
     if (t.status === 'STUCK') bits.push(<span key="s" className="mp sk">{t.stuck_reason ? `Stuck · ${t.stuck_progress ?? 0}% done` : 'Stuck'}</span>);
     if (t.self_created) bits.push(<span key="o" className="ro">Written by employee</span>);
