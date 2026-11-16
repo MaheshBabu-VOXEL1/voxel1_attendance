@@ -116,6 +116,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [unpaidOv, setUnpaidOv] = useState<UnpaidLeaveOverview | null>(null);
   // Team leave balance with joining dates: only Maruthi (the leave approver) sees it.
   const [teamBal, setTeamBal] = useState<Record<string, LeaveBalance> | null>(null);
+  // Maruthi's Leaves tab has two views: the requests (as before) and everyone's leave balance.
+  const [leaveView, setLeaveView] = useState<'requests' | 'balance'>('requests');
   const [limitVal, setLimitVal] = useState('');
   const [limitBusy, setLimitBusy] = useState(false);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -180,13 +182,13 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   // Reload the team balances only when an approved leave changes, not on every 30 s poll.
   const approvedKey = useMemo(() => leaves.filter(l => l.status === 'APPROVED').map(l => `${l.id}:${l.totalDays}`).sort().join(','), [leaves]);
   useEffect(() => {
-    if (!approver || route !== 'leaves' || !people.length) return;
+    if (!approver || route !== 'leaves' || leaveView !== 'balance' || !people.length) return;
     let alive = true;
     void Promise.all(people.map(async p => [p.id, await hrService.getLeaveBalance(p.id)] as const))
       .then(pairs => { if (alive) setTeamBal(Object.fromEntries(pairs)); })
       .catch(() => { if (alive) setTeamBal(cur => cur ?? {}); });
     return () => { alive = false; };
-  }, [approver, route, people, approvedKey]);
+  }, [approver, route, leaveView, people, approvedKey]);
 
   const empName = (id?: string | null) => people.find(e => e.id === id)?.name || '';
   // Dot colour: the person's chosen colour if set, otherwise ARC blue, MEP green, everyone else grey.
@@ -823,8 +825,18 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
         say(`${l.employeeName} · ${status === 'APPROVED' ? 'approved' : 'rejected'}${status === 'APPROVED' && due ? ` · ${plural(due, 'task')} due while away` : ''}`);
       } catch (e) { fail(e); } finally { setBusy(''); }
     };
+    const viewSwitch = approver && <div className="seg leave-views" role="tablist" aria-label="Leaves view">
+      <button type="button" role="tab" aria-selected={leaveView === 'requests'} onClick={() => setLeaveView('requests')}>Requests{waitingLeaves.length ? ` (${waitingLeaves.length})` : ''}</button>
+      <button type="button" role="tab" aria-selected={leaveView === 'balance'} onClick={() => setLeaveView('balance')}>Leave balance</button>
+    </div>;
+    if (approver && leaveView === 'balance') return <>
+      <div className="ph"><div><h1>Leaves</h1><p>Everyone's joining date and leave left</p></div></div>
+      {viewSwitch}
+      {TeamBalances()}
+    </>;
     return <>
       <div className="ph"><div><h1>Leaves</h1><p>{!waitingLeaves.length ? 'All caught up' : canDecideLeave ? `${plural(waitingLeaves.length, 'request')} waiting for you` : `${plural(waitingLeaves.length, 'request')} waiting for Maruthi`}</p></div></div>
+      {viewSwitch}
       {off.length > 0 && <><div className="sec" style={{ marginTop: 0 }}><h2>Off today</h2></div>
         <div className="off">{off.map(l => <div key={l.id}><span className="av sm">{ini(l.employeeName)}</span>{l.employeeName} <small>{typeName(l.type)}</small></div>)}</div></>}
       <div className="sec"><h2>{canDecideLeave ? 'Waiting for you' : 'Waiting for Maruthi'}</h2><span>{waitingLeaves.length || ''}</span></div>
@@ -864,7 +876,6 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
             {l.status === 'APPROVED' ? <span className="st ok">{I.check}Approved</span> : l.status === 'REJECTED' ? <span className="st bad">{I.cross}Rejected</span> : <span className="st warn">Not decided</span>}</div>)}</div>
         </React.Fragment>)}
       </>}
-      {approver && TeamBalances()}
       {unpaidOv && UnpaidLimits(unpaidOv)}
     </>;
   }

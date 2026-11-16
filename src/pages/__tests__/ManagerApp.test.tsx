@@ -429,7 +429,11 @@ describe('manager app', () => {
   it('shows Maruthi every person with joining date and leave balance, and hides it from other managers', async () => {
     const view = render(<ManagerApp user={user} />);
     fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
+    expect(await screen.findByRole('tab', { name: /Requests/, selected: true })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Team leave balance' })).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Leave balance' }));
     await screen.findByRole('heading', { name: 'Team leave balance' });
+    expect(screen.queryByRole('heading', { name: 'Recent decisions' })).toBeNull();
     const ravi = await waitFor(() => { const r = screen.getByText('Ravi', { selector: '.team-bal .rw b' }).closest('.rw') as HTMLElement; expect(r).toBeTruthy(); return r; });
     expect(within(ravi).getByText('Joined 12 Jun 2023')).toBeInTheDocument();
     await waitFor(() => expect(ravi.textContent).toContain('5 left'));
@@ -441,6 +445,7 @@ describe('manager app', () => {
       render(<ManagerApp user={user} />);
       fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
       await screen.findByText('Recent decisions');
+      expect(screen.queryByRole('tab', { name: 'Leave balance' })).toBeNull();
       expect(screen.queryByRole('heading', { name: 'Team leave balance' })).toBeNull();
     } finally { vi.mocked(hrService.isLeaveApprover).mockResolvedValue(true); }
   });
