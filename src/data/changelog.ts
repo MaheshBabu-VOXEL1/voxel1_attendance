@@ -15,6 +15,13 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-11-16',
+    title: 'Manager check-in',
+    entries: [
+      { type: 'feature', description: 'Managers can now check in directly from the Tasks tab: a "Not checked in" card with a Check in button opens the same GPS office check-in as the employee screen. No need to switch to Employee mode first. Check out works as before.' },
+    ],
+  },
+  {
     date: '2026-11-14',
     title: 'Task row alignment on mobile',
     entries: [

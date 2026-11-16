@@ -10,6 +10,7 @@ import type { UnpaidLeaveOverview } from '../services/leave.service';
 import { assignedTaskService, AssignedTask, TaskStatus, TaskProject, TaskPriority, PRIORITIES, priorityLabel, priorityOf, priorityRank } from '../services/assignedTask.service';
 import { calendarService, CalendarEvent } from '../services/calendar.service';
 import { useAssignedTasks } from '../hooks/useAssignedTasks';
+import { subscribePushTarget } from '../services/pushTarget';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { DEFAULT_LEAVE_TYPES } from '../constants';
@@ -311,6 +312,30 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const openEvent = () => { setEvK('ev'); setEvTitle(''); setEvDate(selDay); setSheet({ kind: 'event' }); };
   // Announcements go out today or on a later day, never in the past.
   const openAnnounce = () => { setEvK('an'); setEvTitle(''); setEvTime(''); setEvDate(selDay < T0 ? T0 : selDay); setSheet({ kind: 'event' }); };
+  // A tapped phone notification opens what it is about: the task, today's due list, Leaves, Attendance or the Calendar day.
+  const [pushTask, setPushTask] = useState<{ id: string; refreshed: boolean; waiting?: boolean } | null>(null);
+  useEffect(() => subscribePushTarget(t => {
+    setPop(null); setSheet(null); window.scrollTo(0, 0);
+    if (t.kind === 'task') { setRoute('tasks'); setPushTask({ id: t.taskId, refreshed: false }); }
+    else if (t.kind === 'task_due') { setRoute('tasks'); setTodayView(false); setGroupBy('person'); setTfilter('today'); setQ(''); setSearchOn(false); setPfilter('all'); }
+    else if (t.kind === 'leave') setRoute('leaves');
+    else if (t.kind === 'attendance') { setRoute('attendance'); setAttDate(ymd(new Date())); }
+    else if (t.kind === 'announcement') {
+      const d = t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : ymd(new Date());
+      setRoute('calendar'); setSelDay(d); setCalY(parse(d).getFullYear()); setCalM(parse(d).getMonth());
+    } else setRoute('tasks');
+  }), []);
+  // The task may be newer than the loaded list: refresh once, then open it (or give up quietly).
+  useEffect(() => {
+    if (!pushTask || tasksLoading || pushTask.waiting) return;
+    if (allTasks.some(t => t.id === pushTask.id)) { openTask(pushTask.id); setPushTask(null); }
+    else if (!pushTask.refreshed) {
+      const id = pushTask.id;
+      setPushTask({ id, refreshed: true, waiting: true });
+      void refresh().finally(() => setPushTask(cur => (cur?.id === id ? { id, refreshed: true } : cur)));
+    }
+    else { setPushTask(null); say('That task was deleted or moved.'); }
+  }, [pushTask, allTasks, tasksLoading]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (route !== 'attendance') return;
     let alive = true;
@@ -1061,11 +1086,15 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     </>;
   }
 
-  // Managers don't check in. The card only appears to finish a check-in made
-  // in Employee mode before switching to Manager.
+  // The manager checks in / out straight from the Tasks tab — no Employee-mode switch needed.
+  // Check in opens the same GPS office check-in flow the employee screen uses.
   function AttendanceCard() {
-    const active = attReady && !!attendance?.checkIn && !attendance.checkOut;
-    if (!active) return null;
+    if (!attReady) return null;
+    const active = !!attendance?.checkIn && !attendance.checkOut;
+    if (!active) return <div className="mycheck"><div className="att-l">
+      <div><b>{attendance?.checkOut ? 'Checked out' : 'Not checked in'}</b><span>{attendance?.checkOut ? `at ${punchTimeLabel(attendance.checkOut)}` : 'Tap to mark your attendance'}</span></div></div>
+      <button className="btn att-btn in" disabled={!onNavigate}
+        onClick={() => onNavigate?.('attendance-quick-office')}>Check in</button></div>;
     return <div className="mycheck"><div className="att-l"><span className="dot" />
       <div><b>Checked in</b><span>at {punchTimeLabel(attendance?.checkIn)}</span></div></div>
       <button className="btn att-btn out" disabled={!onNavigate}
