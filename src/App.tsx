@@ -11,6 +11,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { lazyWithReload } from './utils/lazyWithReload';
 import { supabase } from './services/supabase';
 import { sessionManager } from './services/session/sessionManager';
+import { subscribePushTarget } from './services/pushTarget';
 
 // Eager: public pages needed for first paint / SEO
 import Login from './pages/Login';
@@ -249,6 +250,21 @@ const AppContent: React.FC = () => {
 
   // Push subscription handled via PushPermissionPrompt (soft-gate, user-initiated)
 
+  // A tapped phone notification: Employee and Manager screens open it themselves;
+  // other roles (Admin) go to the matching page here.
+  const handleNavigateRef = useRef<(path: string, params?: any) => void>(() => {});
+  useEffect(() => {
+    if (!user || user.role === 'EMPLOYEE' || user.role === 'MANAGER') return;
+    return subscribePushTarget(t => {
+      const go = handleNavigateRef.current;
+      if (t.kind === 'task' || t.kind === 'task_due') go('team-tasks');
+      else if (t.kind === 'leave') go('leave', t.leaveId ? { openLeaveId: t.leaveId } : undefined);
+      else if (t.kind === 'attendance') go('attendance-audit');
+      else if (t.kind === 'announcement') go('calendar');
+      else go('dashboard');
+    });
+  }, [user?.role]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const navigateAndRecord = (path: string, params: any) => {
     const hash = buildHash(path, params);
     // Only a hash that actually changes fires hashchange
@@ -273,6 +289,8 @@ const AppContent: React.FC = () => {
       navigateAndRecord(path, params || null);
     }
   };
+
+  handleNavigateRef.current = handleNavigate;
 
   if (!isConfigured) {
     return <Setup onComplete={() => setConfigured(true)} />;

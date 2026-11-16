@@ -7,6 +7,7 @@ import { calendarService, CalendarEvent } from '../services/calendar.service';
 import { employeeService } from '../services/employeeService';
 import { assignedTaskService, AssignedTask, TaskStatus, priorityLabel, priorityOf, priorityRank } from '../services/assignedTask.service';
 import { useAssignedTasks } from '../hooks/useAssignedTasks';
+import { subscribePushTarget } from '../services/pushTarget';
 import { Attendance, CustomLeaveType, LeaveBalance, LeaveRequest } from '../types';
 import type { UnpaidLeaveUsage } from '../services/leave.service';
 import { DEFAULT_LEAVE_TYPES } from '../constants';
@@ -137,6 +138,40 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
   }, [open]);
   const close = () => { sheet.current?.close(); setOpen(false); apply.current?.focus(); };
   const showLeave = () => { setType(TYPES[0] || ''); setFrom(''); setTo(''); setNote(''); setFormError(''); setOpen(true); };
+  // A tapped phone notification opens what it is about: the task (scrolled to and highlighted),
+  // the leave sheet with its requests, or today's announcement at the top.
+  const [pushTask, setPushTask] = useState<{ id: string; refreshed: boolean; waiting?: boolean } | null>(null);
+  const [pushHit, setPushHit] = useState('');
+  const showLeaveRef = useRef(showLeave); showLeaveRef.current = showLeave;
+  const hiddenRef = useRef(hiddenAnn); hiddenRef.current = hiddenAnn;
+  useEffect(() => subscribePushTarget(t => {
+    setStuckFor(null); setDoneFor(null); setCommentsFor(null);
+    if (t.kind === 'task') { setQuery(''); setPushTask({ id: t.taskId, refreshed: false }); return; }
+    if (sheet.current?.open) { sheet.current.close(); setOpen(false); }
+    if (t.kind === 'leave') { showLeaveRef.current(); return; }
+    if (t.kind === 'announcement' && hiddenRef.current.length) {
+      // An announcement closed earlier on this phone shows again when its notification is tapped.
+      setHiddenAnn([]); try { localStorage.removeItem(hiddenKey); } catch { /* storage unavailable */ }
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }), [hiddenKey]);
+  useEffect(() => {
+    if (!pushTask || loading || pushTask.waiting) return;
+    const t = tasks.find(x => x.id === pushTask.id);
+    if (!t) {
+      // The task may be newer than the loaded list: refresh once, then give up quietly.
+      if (pushTask.refreshed) { setPushTask(null); setMessage('That task was deleted or moved.'); return; }
+      const id = pushTask.id;
+      setPushTask({ id, refreshed: true, waiting: true });
+      void refresh().finally(() => setPushTask(cur => (cur?.id === id ? { id, refreshed: true } : cur)));
+      return;
+    }
+    if (old(t)) setHistory(true);
+    setPushTask(null);
+    setPushHit(t.id);
+    window.setTimeout(() => document.getElementById(`task-${t.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+    window.setTimeout(() => setPushHit(cur => (cur === t.id ? '' : cur)), 2600);
+  }, [pushTask, tasks, loading]); // eslint-disable-line react-hooks/exhaustive-deps
   const start = from;
   const end = to || from;
   let days = 0;
@@ -211,7 +246,7 @@ export default function EmployeeDay({ user, onNavigate }: { user: any; onNavigat
       <div className="list" aria-live="polite">{taskError ? <p className="empty" role="alert">{taskError}</p> : loading ? <p className="empty">Loading tasks…</p> : !visible.length ? <p className="empty">{query ? `No tasks match “${query}”` : 'All clear for today'}</p> : visible.map(t => {
         const done = t.status === 'END', progress = t.status === 'START' || t.status === 'PROGRESS', stuck = t.status === 'STUCK';
         const half = halfDayLabel(t, now);
-        return <div className={`task${done ? ' done' : ''}`} key={t.id}><div className="t"><div className="meta">{!done && <span className={`prio ${priorityOf(t).toLowerCase()}`}>{priorityLabel[priorityOf(t)]}</span>}<span className="project-with-comments"><span className="p">Project: {t.project_name || 'No project'}</span><button type="button" className="task-comments-eye" aria-label={`View previous comments for ${t.description}`} onClick={() => setCommentsFor(t)}><Eye size={18} aria-hidden="true" /></button></span><span className={`d${stuck ? ' stuck' : progress ? ' prog' : ''}`}>{done ? doneToday(t) ? 'Done today' : t.completed_at ? `Done ${short(ymd(new Date(t.completed_at)))}` : 'Done' : stuck ? 'Stuck' : progress ? 'In progress' : 'Not started'}</span></div><div className="ttl">{t.description}</div>{!!t.recurrence_days?.length && <div className="task-dates">{recurrenceLabel(t.recurrence_days)}</div>}{half && <div className={`half${half.late ? ' late' : ''}`}>{half.text}</div>}{stuck && t.stuck_reason && <div className="stuck-note"><b>{t.stuck_progress ?? 0}% done</b> · {t.stuck_reason}</div>}<div className="task-dates">{t.created && <span className="assigned-date">Assigned <time dateTime={t.created}>{new Date(t.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</time></span>}<span className={`due-date${!done && t.due_date && t.due_date < today ? ' overdue' : !done && t.due_date === today ? ' today' : ''}`}>{t.due_date ? <>{!done && t.due_date < today ? 'Overdue' : !done && t.due_date === today ? 'Due today' : 'Due'} <time dateTime={t.due_date}>{date(t.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</time></> : 'No due date'}</span></div></div>{done ? <div className="donebox"><span className="ok"><Check size={13} />Done</span><button disabled={!!busy || !canWrite} onClick={() => updateTask(t,'START')}>Reopen</button></div> : <div className="seg"><button className={progress ? 'on' : ''} disabled={!!busy || !canWrite} onClick={() => updateTask(t,progress ? 'NOT_STARTED' : 'START')}>{progress ? 'Pause' : 'Start'}</button><button className={stuck ? 'on stuck' : ''} aria-pressed={stuck} disabled={!!busy || !canWrite} onClick={() => { if (stuck) void updateTask(t, 'PROGRESS'); else { setStuckErr(''); setStuckFor(t); } }}>Stuck</button><button disabled={!!busy || !canWrite} onClick={() => { setDoneErr(''); setDoneFor(t); }}>Done</button></div>}</div>;
+        return <div className={`task${done ? ' done' : ''}${pushHit === t.id ? ' push-hit' : ''}`} id={`task-${t.id}`} key={t.id}><div className="t"><div className="meta">{!done && <span className={`prio ${priorityOf(t).toLowerCase()}`}>{priorityLabel[priorityOf(t)]}</span>}<span className="project-with-comments"><span className="p">Project: {t.project_name || 'No project'}</span><button type="button" className="task-comments-eye" aria-label={`View previous comments for ${t.description}`} onClick={() => setCommentsFor(t)}><Eye size={18} aria-hidden="true" /></button></span><span className={`d${stuck ? ' stuck' : progress ? ' prog' : ''}`}>{done ? doneToday(t) ? 'Done today' : t.completed_at ? `Done ${short(ymd(new Date(t.completed_at)))}` : 'Done' : stuck ? 'Stuck' : progress ? 'In progress' : 'Not started'}</span></div><div className="ttl">{t.description}</div>{!!t.recurrence_days?.length && <div className="task-dates">{recurrenceLabel(t.recurrence_days)}</div>}{half && <div className={`half${half.late ? ' late' : ''}`}>{half.text}</div>}{stuck && t.stuck_reason && <div className="stuck-note"><b>{t.stuck_progress ?? 0}% done</b> · {t.stuck_reason}</div>}<div className="task-dates">{t.created && <span className="assigned-date">Assigned <time dateTime={t.created}>{new Date(t.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</time></span>}<span className={`due-date${!done && t.due_date && t.due_date < today ? ' overdue' : !done && t.due_date === today ? ' today' : ''}`}>{t.due_date ? <>{!done && t.due_date < today ? 'Overdue' : !done && t.due_date === today ? 'Due today' : 'Due'} <time dateTime={t.due_date}>{date(t.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</time></> : 'No due date'}</span></div></div>{done ? <div className="donebox"><span className="ok"><Check size={13} />Done</span><button disabled={!!busy || !canWrite} onClick={() => updateTask(t,'START')}>Reopen</button></div> : <div className="seg"><button className={progress ? 'on' : ''} disabled={!!busy || !canWrite} onClick={() => updateTask(t,progress ? 'NOT_STARTED' : 'START')}>{progress ? 'Pause' : 'Start'}</button><button className={stuck ? 'on stuck' : ''} aria-pressed={stuck} disabled={!!busy || !canWrite} onClick={() => { if (stuck) void updateTask(t, 'PROGRESS'); else { setStuckErr(''); setStuckFor(t); } }}>Stuck</button><button disabled={!!busy || !canWrite} onClick={() => { setDoneErr(''); setDoneFor(t); }}>Done</button></div>}</div>;
       })}</div>
       {!query.trim() && tasks.some(old) && <button className={`more${history ? ' open' : ''}`} aria-expanded={history} onClick={() => setHistory(!history)}>{history ? 'Hide finished tasks' : `Show more (${tasks.filter(old).length} finished earlier)`}<ChevronDown size={16}/></button>}
     </main>
