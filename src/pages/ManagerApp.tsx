@@ -114,6 +114,8 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
   const [balances, setBalances] = useState<Record<string, LeaveBalance>>({});
   // Unpaid leave this year: used / limit per person; Maruthi (or Admin) sets the limits.
   const [unpaidOv, setUnpaidOv] = useState<UnpaidLeaveOverview | null>(null);
+  // Team leave balance with joining dates: only Maruthi (the leave approver) sees it.
+  const [teamBal, setTeamBal] = useState<Record<string, LeaveBalance> | null>(null);
   const [limitVal, setLimitVal] = useState('');
   const [limitBusy, setLimitBusy] = useState(false);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -174,6 +176,17 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
     const timer = window.setInterval(tick, 30000);
     return () => { alive = false; clearInterval(timer); };
   }, [loadLeaves, loadCalendar]);
+
+  // Reload the team balances only when an approved leave changes, not on every 30 s poll.
+  const approvedKey = useMemo(() => leaves.filter(l => l.status === 'APPROVED').map(l => `${l.id}:${l.totalDays}`).sort().join(','), [leaves]);
+  useEffect(() => {
+    if (!approver || route !== 'leaves' || !people.length) return;
+    let alive = true;
+    void Promise.all(people.map(async p => [p.id, await hrService.getLeaveBalance(p.id)] as const))
+      .then(pairs => { if (alive) setTeamBal(Object.fromEntries(pairs)); })
+      .catch(() => { if (alive) setTeamBal(cur => cur ?? {}); });
+    return () => { alive = false; };
+  }, [approver, route, people, approvedKey]);
 
   const empName = (id?: string | null) => people.find(e => e.id === id)?.name || '';
   // Dot colour: the person's chosen colour if set, otherwise ARC blue, MEP green, everyone else grey.
@@ -851,7 +864,28 @@ export default function ManagerApp({ user, onNavigate }: { user: User; onNavigat
             {l.status === 'APPROVED' ? <span className="st ok">{I.check}Approved</span> : l.status === 'REJECTED' ? <span className="st bad">{I.cross}Rejected</span> : <span className="st warn">Not decided</span>}</div>)}</div>
         </React.Fragment>)}
       </>}
+      {approver && TeamBalances()}
       {unpaidOv && UnpaidLimits(unpaidOv)}
+    </>;
+  }
+
+  // Maruthi only: everyone with their joining date and leave left of each type.
+  function TeamBalances() {
+    const balTypes = leaveTypes.filter(t => t.hasBalance);
+    const joined = (s?: string) => { if (!s) return 'Joining date not added'; const d = parse(s.slice(0, 10)); return `Joined ${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`; };
+    const fmt = (n: number) => String(Math.round(n * 10) / 10);
+    return <>
+      <div className="sec"><h2>Team leave balance</h2><span>{people.length || ''}</span></div>
+      <div className="list team-bal">{!teamBal ? <div className="empty">Loading…</div> : people.map(p => {
+        const b = teamBal[p.id];
+        const up = unpaidOv?.people.find(x => x.employeeId === p.id);
+        return <div className="rw" key={p.id}><span className="av sm">{ini(p.name)}</span>
+          <div className="t"><b>{p.name}</b><span>{joined(p.joiningDate)}</span>
+            <div className="bal-chips">
+              {balTypes.map(t => { const v = Number(b?.[t.id] ?? 0); return <span key={t.id} className={`bal-chip${v <= 0 ? ' none' : ''}`}>{typeName(t.id)} <b>{b ? fmt(v) : '–'}</b> left</span>; })}
+              {up && up.used > 0 && <span className="bal-chip unpaid">Unpaid <b>{fmt(up.used)}</b> used{up.limit !== null ? ` of ${fmt(up.limit)}` : ''}</span>}
+            </div></div></div>;
+      })}</div>
     </>;
   }
 

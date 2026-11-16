@@ -240,6 +240,13 @@ main{max-width:720px;margin:0 auto;padding:16px 16px calc(92px + env(safe-area-i
 .rw .t{flex:1;min-width:0}
 .rw .t b{display:block;font-size:14px;font-weight:600}
 .rw .t span{font-size:12.5px;color:var(--muted)}
+.team-bal .rw{align-items:flex-start;padding-top:10px;padding-bottom:10px}
+.team-bal .rw .av{margin-top:2px}
+.bal-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.rw .t .bal-chip{display:inline-flex;align-items:baseline;gap:4px;font-size:12px;color:var(--ok);background:var(--ok-bg);padding:3px 8px;border-radius:6px;white-space:nowrap}
+.rw .t .bal-chip b{display:inline;font-size:13px;font-weight:700}
+.rw .t .bal-chip.none{color:var(--bad);background:var(--bad-bg)}
+.rw .t .bal-chip.unpaid{color:var(--muted);background:transparent;border:1px solid var(--line-2)}
 .st{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap}
 .st.ok{background:var(--ok-bg);color:var(--ok)} .st.bad{background:var(--bad-bg);color:var(--bad)} .st.warn{background:var(--warn-bg);color:var(--warn)}
 .off{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0}

@@ -24,7 +24,7 @@ vi.mock('../../hooks/useAssignedTasks', () => ({ useAssignedTasks: () => ({ task
 vi.mock('../../context/ThemeContext', () => ({ useTheme: () => ({ darkMode: false, setDarkModePreference: vi.fn() }) }));
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ logout: vi.fn() }) }));
 vi.mock('../../services/employee.service', () => ({ employeeService: { getEmployees: async () => [
-  { id: 'e2', name: 'Ravi', role: 'EMPLOYEE', status: 'ACTIVE', department: 'ARC' }, { id: 'e1', name: 'Divya Kallepalli', role: 'EMPLOYEE', status: 'ACTIVE', department: 'MEP' },
+  { id: 'e2', name: 'Ravi', role: 'EMPLOYEE', status: 'ACTIVE', department: 'ARC', joiningDate: '2023-06-12' }, { id: 'e1', name: 'Divya Kallepalli', role: 'EMPLOYEE', status: 'ACTIVE', department: 'MEP' },
   { id: 'e4', name: 'Abhinay', role: 'EMPLOYEE', status: 'ACTIVE', department: 'IT' },
   { id: 'e5', name: 'Srikanth Gunda', role: 'EMPLOYEE', status: 'ACTIVE', department: 'MEP', dotColour: 'grey' },
   { id: 'mgr', name: 'Test Manager', role: 'MANAGER', status: 'ACTIVE' },
@@ -398,11 +398,11 @@ describe('manager app', () => {
     ] as any);
     render(<ManagerApp user={{ id: 'e3', name: 'Maruthi', role: 'MANAGER' } as any} />);
     fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
-    expect(await screen.findByText('Maruthi', { selector: 'b' })).toBeInTheDocument();
-    expect(screen.getByText('Divya Kallepalli', { selector: 'b' })).toBeInTheDocument();
+    expect(await screen.findByText('Maruthi', { selector: '.lv b' })).toBeInTheDocument();
+    expect(screen.getByText('Divya Kallepalli', { selector: '.lv b' })).toBeInTheDocument();
     expect(screen.getByText('2 requests waiting for you')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Approve' })).toHaveLength(2);
-    fireEvent.click(screen.getByText('Maruthi', { selector: 'b' }).closest('.lv')!.querySelector('.btn.go')!);
+    fireEvent.click(screen.getByText('Maruthi', { selector: '.lv b' }).closest('.lv')!.querySelector('.btn.go')!);
     await waitFor(() => expect(hrService.updateLeaveStatus).toHaveBeenCalledWith('l2', 'APPROVED', '', 'MANAGER'));
   });
 
@@ -417,13 +417,32 @@ describe('manager app', () => {
     fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
     const toggle = await screen.findByRole('button', { name: 'Show archive (3)' });
     expect(screen.getByText('All caught up')).toBeInTheDocument();
-    expect(screen.getByText('Srikanth Gunda', { selector: '.rw b' })).toBeInTheDocument();
-    expect(screen.queryByText('Ravi', { selector: '.rw b' })).toBeNull();
+    expect(screen.getByText('Srikanth Gunda', { selector: '.list:not(.team-bal) .rw b' })).toBeInTheDocument();
+    expect(screen.queryByText('Ravi', { selector: '.list:not(.team-bal) .rw b' })).toBeNull();
     fireEvent.click(toggle);
     const heads = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
     expect(heads.indexOf('September 2026')).toBeLessThan(heads.indexOf('August 2026'));
-    expect(screen.getByText('Ravi', { selector: '.rw b' })).toBeInTheDocument();
+    expect(screen.getByText('Ravi', { selector: '.list:not(.team-bal) .rw b' })).toBeInTheDocument();
     expect(screen.getByText('Not decided')).toBeInTheDocument();
+  });
+
+  it('shows Maruthi every person with joining date and leave balance, and hides it from other managers', async () => {
+    const view = render(<ManagerApp user={user} />);
+    fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
+    await screen.findByRole('heading', { name: 'Team leave balance' });
+    const ravi = await waitFor(() => { const r = screen.getByText('Ravi', { selector: '.team-bal .rw b' }).closest('.rw') as HTMLElement; expect(r).toBeTruthy(); return r; });
+    expect(within(ravi).getByText('Joined 12 Jun 2023')).toBeInTheDocument();
+    await waitFor(() => expect(ravi.textContent).toContain('5 left'));
+    expect(ravi.textContent).toContain('7 left');
+    expect(within(screen.getByText('Abhinay', { selector: '.team-bal .rw b' }).closest('.rw') as HTMLElement).getByText('Joining date not added')).toBeInTheDocument();
+    view.unmount();
+    vi.mocked(hrService.isLeaveApprover).mockResolvedValue(false);
+    try {
+      render(<ManagerApp user={user} />);
+      fireEvent.click(screen.getByRole('button', { name: /Leaves/ }));
+      await screen.findByText('Recent decisions');
+      expect(screen.queryByRole('heading', { name: 'Team leave balance' })).toBeNull();
+    } finally { vi.mocked(hrService.isLeaveApprover).mockResolvedValue(true); }
   });
 
   it('keeps the archive from managers who do not approve leave', async () => {
@@ -559,7 +578,7 @@ describe('manager app', () => {
     expect(screen.getByText('10 used of 9')).toBeInTheDocument();
     expect(screen.getByText('Over')).toBeInTheDocument();
     expect(screen.getByText('0 used of 12 · own limit')).toBeInTheDocument();
-    expect(screen.queryByText(/Abhinay/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Abhinay/, { selector: '.list:not(.team-bal) *' })).not.toBeInTheDocument();
     const everyone = screen.getByText('Everyone').closest('.rw') as HTMLElement;
     fireEvent.click(within(everyone).getByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByLabelText('Unpaid days a year'), { target: { value: '12' } });

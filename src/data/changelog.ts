@@ -18,6 +18,7 @@ export const changelog: ChangelogRelease[] = [
     date: '2026-11-16',
     title: 'Manager check-in',
     entries: [
+      { type: 'feature', description: 'Leaves tab: new "Team leave balance" list for Maruthi only — every person with their joining date, Casual & Sick and Paid days left, and unpaid days used this year.' },
       { type: 'feature', description: 'Announcements now send a phone notification to everyone: at once for today, or at 8:00 AM on the chosen day.' },
       { type: 'feature', description: 'Managers get a "Due today" phone notification at 10:30 AM for each person with unfinished tasks due that day; tapping it opens Tasks grouped by person, filtered to Today.' },
       { type: 'fix', description: 'Tapping a phone notification now opens what it is about: the task (Managers: the task sheet; Employees: the task is scrolled to and highlighted), Leaves, Attendance, or the announcement, instead of always the home screen.' },
