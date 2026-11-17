@@ -9,6 +9,7 @@ export const AI_SUGGESTIONS = [
   'Which tasks are delayed?',
   'Who came late today?',
   'Give me a status summary for today',
+  'Which tasks could be automated?',
 ];
 
 /** **bold** inside a line, without HTML injection. */
@@ -58,7 +59,7 @@ export default function AiAssistantChat({ messages, setMessages, onClose }: {
       <h2 id="sheetT">Voxel1_Daily assistant</h2><span className="ai-beta">Testing</span>
       <button type="button" className="ai-x" aria-label="Close" onClick={onClose}><X size={18} aria-hidden="true" /></button>
     </div>
-    <p className="ai-sub">Ask about today's tasks, attendance and leave. Answers come from live app data. It can't change anything.</p>
+    <p className="ai-sub">Ask about today's tasks, attendance and leave, or which tasks could be automated. Answers come from live app data. It can't change anything.</p>
 
     <div className="ai-msgs" aria-live="polite">
       {!messages.length && <div className="ai-sugs">{AI_SUGGESTIONS.map(s =>

@@ -1,5 +1,6 @@
 // AI assistant for the Manager screen: answers questions about today's team, tasks,
-// attendance and leave ("Who has no task today?", "Which tasks are stuck and why?").
+// attendance and leave ("Who has no task today?", "Which tasks are stuck and why?"),
+// and recommends which kinds of tasks could be automated (from the last 60 days of tasks).
 //
 // Read-only: it never changes data. It reads with the caller's own login, so it sees
 // exactly what that manager may see. Only allowed users (public.can_use_ai_assistant:
@@ -8,6 +9,7 @@
 // Secrets (Supabase > Edge Functions > Secrets): GEMINI_API_KEY (required),
 // GEMINI_MODEL (optional, default below). The key never comes from the request.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { findAutomationCandidates } from './automation.ts';
 
 const MODEL_DEFAULT = 'gemini-3.8-flash';
 const TZ = 'Asia/Kolkata';
@@ -55,7 +57,8 @@ Deno.serve(async (req) => {
     const today = ymd(new Date());
     const in14 = ymd(new Date(Date.now() + 14 * 864e5));
     const dayStart = new Date(`${today}T00:00:00+05:30`).toISOString();
-    const [people, openTasks, doneToday, attendance, leaves, cfgRow] = await Promise.all([
+    const since60 = new Date(Date.now() - 60 * 864e5).toISOString();
+    const [people, openTasks, doneToday, attendance, leaves, cfgRow, recentTasks] = await Promise.all([
       db.from('profiles').select('id,name,role,status').neq('status', 'INACTIVE'),
       db.from('assigned_tasks').select('*').neq('status', 'END').limit(1500),
       db.from('assigned_tasks').select('*').eq('status', 'END').gte('completed_at', dayStart).limit(500),
@@ -63,8 +66,10 @@ Deno.serve(async (req) => {
       db.from('leaves').select('employee_id,employee_name,type,start_date,end_date,status')
         .lte('start_date', in14).gte('end_date', today).in('status', ['APPROVED', 'PENDING_MANAGER', 'PENDING_HR']),
       db.from('settings').select('value').eq('key', 'app_config').limit(1).maybeSingle(),
+      db.from('assigned_tasks').select('description,employee_id,employee_name,project_name,status,created,started_at,completed_at')
+        .gte('created', since60).order('created', { ascending: true }).limit(3000),
     ]);
-    for (const r of [people, openTasks, doneToday, attendance, leaves]) if (r.error) throw r.error;
+    for (const r of [people, openTasks, doneToday, attendance, leaves, recentTasks]) if (r.error) throw r.error;
 
     let cfg: any = {};
     try { cfg = typeof cfgRow.data?.value === 'string' ? JSON.parse(cfgRow.data.value) : (cfgRow.data?.value || {}); } catch { /* defaults */ }
@@ -115,13 +120,17 @@ Deno.serve(async (req) => {
       attendance_today: att,
       leave_next_14_days: (leaves.data || []).map((l: any) => ({ name: l.employee_name, type: l.type, from: l.start_date, to: l.end_date, status: l.status })),
       all_open_tasks: open.map(compact),
+      // Exact, worked out in code: task kinds that repeat (3+ times) or look like routine work, last 60 days.
+      automation_candidates: findAutomationCandidates(recentTasks.data || [], who),
+      tasks_looked_at_for_automation: (recentTasks.data || []).length,
     };
 
     const system = [
       'You are the Voxel1 Daily app assistant for managers at Voxel1 (an engineering/BIM firm in Hyderabad).',
       'Answer ONLY from the JSON data below (live app data). The lists employees_with_no_open_task, stuck_tasks, overdue_tasks, late_today, not_checked_in_today and counts are already exact: copy them, never recount or filter them yourself. If the data does not contain the answer, say so. Never invent people, tasks or numbers.',
       'Be short: lead with the direct answer, then one line per person or task. Use names. Use 12-hour times (10:34 am) and dates like "13 Nov". Statuses: NOT_STARTED, START, PROGRESS, STUCK. Telling a long list: show up to 15 and say how many more.',
-      'You cannot change anything; if asked to assign, edit or announce, say this version only answers questions.',
+      'Automation: when asked which tasks could be automated (or how to save time), use automation_candidates (already exact; from tasks_looked_at_for_automation tasks in the last 60 days). For the best 3 to 7, give: the task, how often it came up (times_given, weeks_seen) and who does it, then ONE practical way to automate it at a small firm, e.g. a recurring task in this app, a Google Sheets / Excel formula or macro, an email or WhatsApp template, a scheduled report, a Power Automate / Zapier flow, a Revit/AutoCAD/Dynamo script for drawing or BIM work, or an AI tool for drafting. Say what it would save, using avg_hours_to_finish when present; do not invent hours. If automation_candidates is empty, say no task repeats often enough yet and suggest what to watch for. Recommendations are suggestions only.',
+      'You cannot change anything; if asked to assign, edit or announce, say you can only answer and suggest, not change data.',
       'Reply in the language the manager writes in (English, Telugu or Hinglish).',
       '', 'DATA:', JSON.stringify(context),
     ].join('\n');
@@ -138,8 +147,8 @@ Deno.serve(async (req) => {
       signal: AbortSignal.timeout(40_000),
     });
     // Little "thinking" = much faster. If this model does not accept that setting, retry without it.
-    let res = await call({ maxOutputTokens: 900, temperature: 0.2, thinkingConfig: { thinkingBudget: 0 } });
-    if (res.status === 400) res = await call({ maxOutputTokens: 900, temperature: 0.2 });
+    let res = await call({ maxOutputTokens: 1300, temperature: 0.2, thinkingConfig: { thinkingBudget: 0 } });
+    if (res.status === 400) res = await call({ maxOutputTokens: 1300, temperature: 0.2 });
     const out = await res.json().catch(() => null);
     if (!res.ok) {
       console.error('[ai-assistant] Gemini error', res.status, JSON.stringify(out?.error || out).slice(0, 500));
