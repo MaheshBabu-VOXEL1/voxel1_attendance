@@ -104,6 +104,13 @@ export const changelog: ChangelogRelease[] = [
     ],
   },
   {
+    date: '2026-11-17',
+    title: 'Madhapur attendance radius',
+    entries: [
+      { type: 'feature', description: 'Madhapur office attendance now works within 500 m. The attendance screen still shows the usual 200 m radius. Migration 0100 applies the same rule on the server.' },
+    ],
+  },
+  {
     date: '2026-10-22',
     title: 'HITEC City attendance location',
     entries: [

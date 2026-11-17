@@ -9,6 +9,9 @@ export interface GeofenceStatus {
   /** This office's allowed radius in metres. */
   radiusM: number;
   inside: boolean;
+  /** Distance and radius as shown to the user (same as the real values unless the office has a displayRadius). */
+  shownDistanceM: number;
+  shownRadiusM: number;
 }
 
 /** An office's radius; missing or non-positive means GEOFENCE_RADIUS_M (same rule as the database). */
@@ -34,7 +37,13 @@ export const computeGeofence = (lat: number, lng: number, fences: OfficeLocation
   for (const office of fences) {
     const distanceM = distanceMeters(lat, lng, office.lat, office.lng);
     const radiusM = officeRadius(office);
-    const status = { officeName: office.name, distanceM, radiusM, inside: distanceM <= radiusM };
+    const inside = distanceM <= radiusM;
+    const shownRadiusM = Number(office.displayRadius) > 0 ? Number(office.displayRadius) : radiusM;
+    // Display-only offset: outside, show the distance as if the radius were shownRadiusM; inside, never exceed it.
+    const shownDistanceM = inside
+      ? Math.min(distanceM, shownRadiusM)
+      : distanceM - (radiusM - shownRadiusM);
+    const status = { officeName: office.name, distanceM, radiusM, inside, shownDistanceM, shownRadiusM };
     const better = !best
       || (status.inside && !best.inside)
       || (status.inside === best.inside && distanceM < best.distanceM);

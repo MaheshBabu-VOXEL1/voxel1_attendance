@@ -62,7 +62,7 @@ const Attendance: React.FC<AttendanceProps> = ({ user, onFinish }) => {
     if (status !== 'idle' || !location) return;
 
     if (!geofence?.inside) {
-      showToast(`You must be within ${Math.round(geofence?.radiusM ?? GEOFENCE_RADIUS_M)} m of your office to punch attendance.`, 'warning');
+      showToast(`You must be within ${Math.round(geofence?.shownRadiusM ?? GEOFENCE_RADIUS_M)} m of your office to punch attendance.`, 'warning');
       return;
     }
 

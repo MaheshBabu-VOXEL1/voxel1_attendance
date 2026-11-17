@@ -175,6 +175,8 @@ export interface OfficeLocation {
   lat: number;
   lng: number;
   radius: number;
+  /** Radius shown in the UI when it differs from the enforced `radius`. */
+  displayRadius?: number;
 }
 
 export interface BlogPost {

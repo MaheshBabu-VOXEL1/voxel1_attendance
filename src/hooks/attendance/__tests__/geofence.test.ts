@@ -29,8 +29,9 @@ describe('HITEC City attendance site', () => {
 });
 
 // Two offices ~1.1 km apart on the same latitude.
-describe('restored Madhapur and Aparna Serene Park sites', () => {
-  it.each(OFFICE_LOCATIONS.slice(2))('allows $name within 200 m only', site => {
+describe('Aparna Serene Park site', () => {
+  it('allows within 200 m only', () => {
+    const site = OFFICE_LOCATIONS[3];
     const north = (metres: number) => site.lat + metres / 6371000 * 180 / Math.PI;
     const result = computeGeofence(site.lat, site.lng, OFFICE_LOCATIONS);
     expect(result?.officeName).toBe(site.name);
@@ -38,6 +39,31 @@ describe('restored Madhapur and Aparna Serene Park sites', () => {
     expect(result?.radiusM).toBe(200);
     expect(computeGeofence(north(199), site.lng, OFFICE_LOCATIONS)?.inside).toBe(true);
     expect(computeGeofence(north(201), site.lng, OFFICE_LOCATIONS)?.inside).toBe(false);
+  });
+});
+
+describe('Madhapur site (enforced 500 m, displayed 200 m)', () => {
+  const site = OFFICE_LOCATIONS[2];
+  const north = (metres: number) => site.lat + metres / 6371000 * 180 / Math.PI;
+
+  it('enforces 500 m but displays a 200 m radius', () => {
+    expect(computeGeofence(north(499), site.lng, OFFICE_LOCATIONS)?.inside).toBe(true);
+    expect(computeGeofence(north(501), site.lng, OFFICE_LOCATIONS)?.inside).toBe(false);
+    expect(computeGeofence(site.lat, site.lng, OFFICE_LOCATIONS)?.shownRadiusM).toBe(200);
+  });
+
+  it('shows real distance near the office and never more than 200 m while inside', () => {
+    const near = computeGeofence(north(19), site.lng, OFFICE_LOCATIONS);
+    expect(Math.round(near!.shownDistanceM)).toBe(19);
+    const mid = computeGeofence(north(400), site.lng, OFFICE_LOCATIONS);
+    expect(mid?.inside).toBe(true);
+    expect(mid?.shownDistanceM).toBe(200);
+  });
+
+  it('shows real distance minus 300 m when outside', () => {
+    const far = computeGeofence(north(510), site.lng, OFFICE_LOCATIONS);
+    expect(far?.inside).toBe(false);
+    expect(Math.round(far!.shownDistanceM)).toBe(210);
   });
 });
 

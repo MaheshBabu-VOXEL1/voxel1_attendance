@@ -88,13 +88,13 @@ export const LocationDisplay: React.FC<Props> = ({ location, geofence, isLocatin
             {inside ? <MapPin size={13} className="text-white flex-shrink-0" /> : <AlertTriangle size={13} className="text-white flex-shrink-0" />}
             <span className="text-[11px] font-semibold text-white uppercase tracking-wide leading-tight text-center">
               {inside
-                ? `At ${geofence.officeName} · ${formatDistance(geofence.distanceM)}`
-                : `Outside office · ${formatDistance(geofence.distanceM)} from ${geofence.officeName}`}
+                ? `At ${geofence.officeName} · ${formatDistance(geofence.shownDistanceM)}`
+                : `Outside office · ${formatDistance(geofence.shownDistanceM)} from ${geofence.officeName}`}
             </span>
           </div>
           {!inside && (
             <span className="text-[10px] font-medium text-white/95 text-center leading-snug">
-              Move within {formatDistance(geofence.radiusM)} of the office, then tap here to recheck
+              Move within {formatDistance(geofence.shownRadiusM)} of the office, then tap here to recheck
             </span>
           )}
         </div>
