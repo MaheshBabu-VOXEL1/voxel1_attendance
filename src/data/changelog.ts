@@ -19,6 +19,7 @@ export const changelog: ChangelogRelease[] = [
     title: 'AI assistant suggests automations',
     entries: [
       { type: 'feature', description: 'The AI assistant can now recommend which tasks could be automated. It looks at the last 60 days of tasks, finds the ones that repeat or look like routine work (reports, sheet updates, uploads, exports), and suggests a practical way to automate each one, with how often it came up and who does it. New suggestion button: "Which tasks could be automated?"' },
+      { type: 'fix', description: 'Automation suggestions no longer claim "hours saved": the number was how long a task stayed open (nights and weekends included), not work time. It now says how many days the task usually stays open.' },
     ],
   },
   {

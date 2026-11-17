@@ -18,7 +18,7 @@ export interface AutomationCandidate {
   times_given: number;     // how many tasks matched in the period
   people: string[];        // who did them
   weeks_seen: number;      // in how many different weeks it came up
-  avg_hours_to_finish: number | null;
+  avg_days_open: number | null; // calendar days from start to done (includes nights/weekends), NOT work effort
   projects: string[];
   routine_words: string[]; // words that suggest routine work ("report", "upload"…)
   why: 'repeats' | 'routine_work';
@@ -65,15 +65,15 @@ export function findAutomationCandidates(tasks: TaskRow[], nameOf: (t: TaskRow) 
     const repeats = rows.length >= 3;
     if (!repeats && !(routine.length && rows.length >= 2)) continue;
 
-    const hours = rows.filter(r => r.completed_at && (r.started_at || r.created))
-      .map(r => (Date.parse(r.completed_at!) - Date.parse((r.started_at || r.created)!)) / 36e5)
-      .filter(h => h >= 0 && h < 24 * 30);
+    const days = rows.filter(r => r.completed_at && (r.started_at || r.created))
+      .map(r => (Date.parse(r.completed_at!) - Date.parse((r.started_at || r.created)!)) / 864e5)
+      .filter(d => d >= 0 && d < 60);
     out.push({
       task: (rows[rows.length - 1].description || '').trim().slice(0, 140),
       times_given: rows.length,
       people: [...new Set(rows.map(nameOf))],
       weeks_seen: new Set(rows.filter(r => r.created).map(r => weekOf(r.created!))).size,
-      avg_hours_to_finish: hours.length ? Math.round((hours.reduce((a, b) => a + b, 0) / hours.length) * 10) / 10 : null,
+      avg_days_open: days.length ? Math.round((days.reduce((a, b) => a + b, 0) / days.length) * 10) / 10 : null,
       projects: [...new Set(rows.map(r => r.project_name).filter((p): p is string => !!p))],
       routine_words: routine,
       why: repeats ? 'repeats' : 'routine_work',

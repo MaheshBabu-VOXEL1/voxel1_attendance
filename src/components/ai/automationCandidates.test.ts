@@ -19,7 +19,7 @@ describe('automation candidates', () => {
     ];
     const [c, ...rest] = findAutomationCandidates(rows, who);
     expect(rest).toHaveLength(0);
-    expect(c).toMatchObject({ times_given: 3, weeks_seen: 3, people: ['Abhinay', 'Dharani'], avg_hours_to_finish: 3, why: 'repeats' });
+    expect(c).toMatchObject({ times_given: 3, weeks_seen: 3, people: ['Abhinay', 'Dharani'], avg_days_open: 0.1, why: 'repeats' });
     expect(c.routine_words).toEqual(expect.arrayContaining(['update', 'sheet']));
   });
 
