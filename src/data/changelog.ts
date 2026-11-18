@@ -18,6 +18,7 @@ export const changelog: ChangelogRelease[] = [
     date: '2026-11-18',
     title: 'No notification on auto check-out',
     entries: [
+      { type: 'fix', description: 'Auto check-out at midnight now actually runs. The scheduled job for it was missing in the live database, so forgotten check-outs stayed open until the person next opened the app. A job inside the database (every 5 minutes) now closes any open session once its close time (default 23:59 India time) has passed, and stamps the check-out at that time. Migration 0105 (applied live; first run succeeded).' },
       { type: 'fix', description: 'When the system auto checks someone out (midnight max-time close, or a forgotten check-out closed the next day), managers no longer get an "Employee checked out" notification. A person checking out themselves still notifies as before. Database migration 0104 (applied live).' },
     ],
   },
