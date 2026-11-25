@@ -309,7 +309,7 @@ const AppContent: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-slate-50">
+      <div className="h-screen w-full flex items-center justify-center bg-slate-50" data-app-loading>
         <Loader2 className="animate-spin text-primary" size={48} />
       </div>
     );
@@ -378,7 +378,7 @@ const AppContent: React.FC = () => {
   };
 
   const suspenseFallback = (
-    <div className="h-screen w-full flex items-center justify-center bg-slate-50">
+    <div className="h-screen w-full flex items-center justify-center bg-slate-50" data-app-loading>
       <Loader2 className="animate-spin text-primary" size={48} />
     </div>
   );

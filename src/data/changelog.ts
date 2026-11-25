@@ -15,6 +15,13 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-11-25',
+    title: 'Opening animation',
+    entries: [
+      { type: 'improvement', description: 'Opening the app now shows the Voxel1 shield in the middle of the screen instead of a loading spinner. When the app is ready, the shield shrinks and flies into the logo at the top left. Pages without that logo (log in, admin) fade in instead.' },
+    ],
+  },
+  {
     date: '2026-11-18',
     title: 'No notification on auto check-out',
     entries: [
