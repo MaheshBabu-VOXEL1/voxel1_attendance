@@ -19,6 +19,7 @@ export const changelog: ChangelogRelease[] = [
     title: 'Opening animation',
     entries: [
       { type: 'improvement', description: 'Opening the app now shows the Voxel1 shield in the middle of the screen instead of a loading spinner. When the app is ready, the shield shrinks and flies into the logo at the top left. Pages without that logo (log in, admin) fade in instead.' },
+      { type: 'fix', description: 'The logo is now sharp on phones, both during the opening animation and in the top-left header. It uses a new high-resolution logo (voxel1-mark.png) instead of the small 96 px image, and the animation changes the logo\'s real size instead of scaling a picture of it.' },
     ],
   },
   {

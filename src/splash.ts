@@ -31,19 +31,22 @@ export function runSplash(): void {
     const to = target.getBoundingClientRect();
     if (reduceMotion || !from.width || !to.width) { fadeOut(); return; }
 
-    const dx = (to.left + to.width / 2) - (from.left + from.width / 2);
-    const dy = (to.top + to.height / 2) - (from.top + from.height / 2);
-    const scale = to.width / from.width;
+    const place = (r: { left: number; top: number; width: number; height: number }) => {
+      logo.style.left = `${r.left}px`;
+      logo.style.top = `${r.top}px`;
+      logo.style.width = `${r.width}px`;
+      logo.style.height = `${r.height}px`;
+    };
 
     // Hide the real header logo until the flying one lands on it.
     target.style.visibility = 'hidden';
-    // Freeze the pop-in at rest first, then start the move on the next frame
-    // so the browser animates it instead of jumping straight to the end.
+    // Pin the logo where it is, then move and resize it on the next frame.
+    // Animating the real size (not a scale effect) keeps the image sharp
+    // at every step of the flight.
+    place(from);
     splash.classList.add('is-flying');
     void logo.offsetWidth;
-    requestAnimationFrame(() => {
-      logo.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
-    });
+    requestAnimationFrame(() => place(to));
 
     window.setTimeout(() => {
       target.style.visibility = '';

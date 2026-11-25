@@ -43,7 +43,7 @@ button{cursor:pointer}
 .appbar.scrolled{border-bottom-color:var(--line)}
 .appbar-in{max-width:520px;margin:0 auto;height:52px;padding:0 16px;display:flex;align-items:center;justify-content:space-between}
 .lockup{display:flex;align-items:center;gap:9px;text-decoration:none}
-.lockup img{width:22px;height:26px;display:block}
+.lockup img{width:24px;height:26px;display:block}
 .lockup .wm{display:flex;flex-direction:column;line-height:1}
 .lockup .wm b{font-size:14px;font-weight:800;letter-spacing:.16em;color:var(--navy)}
 .lockup .wm span{display:none}
